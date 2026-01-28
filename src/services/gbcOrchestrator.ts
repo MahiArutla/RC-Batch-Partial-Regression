@@ -46,6 +46,22 @@ export class GbcOrchestrator {
 fileDetails.downloadFileType = 'ReturnFile';
     await downloadPage.setDownloadCriteria(fileDetails);
     await downloadPage.downloadAndVerify(fileDetails, downloadDir, testName);
+    // Validate that PartnerReference is present in the return file
+    const fs = await import('fs');
+    if (!fileDetails.returnFileName || !fileDetails.partnerReference) {
+      throw new Error('Return file name or partner reference is not set in fileDetails.');
+    }
+    const returnFilePath = path.join(process.cwd(), 'artifacts', testName, fileDetails.returnFileName);
+    let found = false;
+    for (const line of fs.readFileSync(returnFilePath, 'utf-8').split(/\r?\n/)) {
+      if (line.includes(fileDetails.partnerReference)) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      throw new Error(`${fileDetails.partnerReference} not present in Return File`);
+    }
     console.log(`File processed with Batchnumber ${fileDetails.batchNumber}, filename ${fileDetails.inputFileName}  PartnerReference ${fileDetails.partnerReference} and OrderId ${fileDetails.orderId}`);
 
     return fileDetails;

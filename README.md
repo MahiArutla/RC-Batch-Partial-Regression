@@ -1,43 +1,4 @@
-# BMO Playwright Migration
 
-Playwright/TypeScript port of the Selenium test `TC234283_BMO_AllProvinceHappyPath`. Only the logic, data, and helpers required by this scenario were migrated.
-
-## Prerequisites
-
-- Node.js 18+
-- Access to the legacy data directory so the sample file `BMO_AllProvincesWithValidData` can be reused.
-- Network access to the CGE QA SQL Server, SFTP share, and Manual Processing API.
-
-## Setup
-
-```bash
-cd "Playwright Batch/bmo-playwright"
-npm install
-copy .env.example .env # update secrets as needed
-```
-
-## Running the test
-
-```bash
-npx playwright test
-```
-
-Use `npx playwright test --headed` to observe the browser run.
-
-## Project layout
-
-```
-src/
-  config/      # env + constant helpers
-  data/        # scenario-specific metadata
-  models/      # TS models (file details, lien, etc.)
-  pages/       # Playwright page objects
-  services/    # File, DB, Hangfire, manual processing helpers
-  utils/       # Shared utilities (fs, random values)
-tests/
-  bmo-all-province-happy-path.spec.ts  # migrated test case
-  gbc-all-province-happy-path.spec.ts  # GBC NF smoke test (XIF)
-```
 
 ## Excel-driven Test Data
 

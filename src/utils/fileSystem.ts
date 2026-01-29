@@ -105,3 +105,37 @@ export async function clearDirectory(targetDir: string): Promise<void> {
     // Ignore errors (e.g., directory does not exist); caller may create it
   }
 }
+
+export async function updateBatchNumberInFordFile(filePath: string, newBatchNumber: string): Promise<void> {
+  // Read all lines
+  const raw = await fs.readFile(filePath, 'utf-8');
+  const lines = raw.split(/\r?\n/);
+
+  const replaceFirstDate = (input: string, newDate: string): string => {
+    const re = /\d{4}-\d{2}-\d{2}/;
+    return input.replace(re, newDate);
+  };
+
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const MM = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  const todayStr = `${yyyy}-${MM}-${dd}`;
+
+  // Header line (line 0)
+  if (lines.length > 0) {
+    lines[0] = replaceFirstDate(lines[0], todayStr);
+    // Replace only the literal token "BatchN" with the new batch number
+    lines[0] = lines[0].replace(/\bBatchN\b/g, newBatchNumber);
+    // Normalize: remove any hyphen directly before the 8-digit batch number
+    lines[0] = lines[0].replace(/-(\d{8})(\b)/, '$1$2');
+  }
+
+  // Trailer / control record (line 15 => index 14)
+  const trailerIndex = 14;
+  if (lines.length > trailerIndex) {
+    lines[trailerIndex] = replaceFirstDate(lines[trailerIndex], todayStr);
+  }
+
+  await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
+}

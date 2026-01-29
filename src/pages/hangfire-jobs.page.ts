@@ -76,6 +76,27 @@ export class HangfireJobsPage {
     await db.validateHandshakeJobStatus(fileDetails);
     console.log('Handshake job status validated in DB');
   }
+  async goToFordHFJobs(db: any, fileDetails: any): Promise<void> {
+    await this.hangfireDashboard.click();
+    await this.hfJobs.click();
+    // Switch to frame is handled by frameLocator
+    await this.hfDashboardTab.click();
+    await this.hfDbRecurringJobsTab.click();
+    await this.triggerHFJob('ClientFileScheduler');
+    console.log('Triggered ClientFileScheduler Hangfire job');
+    await db.validateClientFileSchedulerJobFileStatusInDB(fileDetails);
+    console.log('File got picked up from SFTP & File status and process status validated in DB for ClientFileScheduler job ');
+    await this.triggerHFJob('File Parsing');
+    console.log('Triggered File Parsing Hangfire job');
+    await this.triggerHFJob('LVS');
+    console.log('Triggered LVS Hangfire job');
+    await this.triggerHFJob('Create JSON');
+    console.log('Triggered Create JSON Hangfire job');
+    await this.triggerHFJob('SendToCGe');
+    console.log('Triggered SendToCGe Hangfire job');
+   await this.triggerHFJob('Handshake');
+    console.log('Triggered Handshake Hangfire job');
+     }
 async goToHFJobsForReturnFile(db: any, fileDetails: any): Promise<void> {
     await this.hangfireDashboard.click();
     await this.hfJobs.click();
@@ -121,11 +142,33 @@ async goToHFJobsForReturnFile(db: any, fileDetails: any): Promise<void> {
       await this.processingJobsCount();
     }
   }
+async waitForHangfireReady(): Promise<void> {
+  // Ensure we are on the Hangfire view before waiting for the iframe
+  try { await this.hangfireDashboard.click({ timeout: 5000 }); } catch {}
+  try { await this.hfJobs.click({ timeout: 5000 }); } catch {}
+
+  const iframe = this.page.locator(HANGFIRE_IFRAME);
+  await iframe.waitFor({ state: 'attached', timeout: 30000 });
+
+  await this.hangfireFrame
+    .getByRole('link', { name: /Hangfire Dashboard/i })
+    .waitFor({ state: 'visible', timeout: 20000 });
+}
+async disableStickyHeader(): Promise<void> {
+  await this.page.addStyleTag({
+    content: `
+      app-header, mat-toolbar {
+        display: none !important;
+      }
+    `
+  });
+}
 
   async scheduledJobsCountMethod(): Promise<void> {
     try {
       await this.page.waitForTimeout(1000);
       await this.scheduledJobs.click();
+     await this.page.waitForTimeout(2000);
       const schCountText = await this.scheduledJobsCount.textContent();
       const schCountVal = parseInt(schCountText || '0', 10);
       if (schCountVal > 0) {

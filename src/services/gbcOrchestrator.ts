@@ -22,6 +22,13 @@ export class GbcOrchestrator {
     // Create NF file and set OrderId in fileDetails as a side effect
     await gbcNfService.createNfFileXif(fileDetails);
 
+    if (!fileDetails.inputFileDescription) {
+      throw new Error(
+        `InputFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the NF UniqueId.`
+      );
+    }
+
     const db = gbcNfService.getDbService();
     const hangfirePage = new HangfireJobsPage(page);
     await hangfirePage.goToHFJobs(db, fileDetails);
@@ -41,7 +48,15 @@ export class GbcOrchestrator {
     );
     console.log('Summary report file downloaded and verified:', fileDetails.summaryReportFileName);
 
+    if (!fileDetails.returnFileDescription) {
+      throw new Error(
+        `ReturnFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the Return UniqueId.`
+      );
+    }
     await db.setProcessAndFileStatusToNotStartedReturn(fileDetails);
+    await hangfirePage.waitForHangfireReady();
+    await hangfirePage.disableStickyHeader();
     await hangfirePage.goToHFJobsForReturnFile(db, fileDetails);
 fileDetails.downloadFileType = 'ReturnFile';
     await downloadPage.setDownloadCriteria(fileDetails);
@@ -60,8 +75,9 @@ fileDetails.downloadFileType = 'ReturnFile';
       }
     }
     if (!found) {
-      throw new Error(`${fileDetails.partnerReference} not present in Return File`);
+      throw new Error(`${fileDetails.partnerReference} not present in Return File ${fileDetails.returnFileName  }`);
     }
+    console.log(`PartnerReference ${fileDetails.partnerReference} found in Return File ${fileDetails.returnFileName}`);
     console.log(`File processed with Batchnumber ${fileDetails.batchNumber}, filename ${fileDetails.inputFileName}  PartnerReference ${fileDetails.partnerReference} and OrderId ${fileDetails.orderId}`);
 
     return fileDetails;

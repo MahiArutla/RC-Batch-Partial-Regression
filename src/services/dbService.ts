@@ -25,6 +25,23 @@ export class DbService {
     }
     this.poolPromise = sql.connect(env.dbConnectionString);
   }
+  private async waitFor<T>(
+    fetch: () => Promise<T>,
+    predicate: (value: T) => boolean,
+    options: { timeoutMs?: number; intervalMs?: number } = {}
+  ): Promise<T> {
+    const timeoutMs = options.timeoutMs ?? 60_000;
+    const intervalMs = options.intervalMs ?? 2_000;
+    const start = Date.now();
+    let last: T;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      last = await fetch();
+      if (predicate(last)) return last;
+      if (Date.now() - start > timeoutMs) return last;
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+  }
 
   private async getPool(): Promise<sql.ConnectionPool> {
     return this.poolPromise;
@@ -185,8 +202,11 @@ export class DbService {
   }
 
   async validateClientFileSchedulerJobFileStatusInDB(fileDetails: FileDetails): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for job to process
-    const status = await this.getProcessAndFileStatus(fileDetails.uniqueId!);
+    const status = await this.waitFor<ProcessStatusFileStatusResponse>(
+      () => this.getProcessAndFileStatus(fileDetails.uniqueId!),
+      (s) => s.processStatusId === 10 && s.fileStatusId === 11,
+      { timeoutMs: 60_000, intervalMs: 2_000 }
+    );
     if (status.processStatusId !== 10) {
       throw new Error(`Process Status is not updated as Ready: ${status.processStatusId}`);
     }
@@ -217,9 +237,16 @@ export class DbService {
     return response;
   }
 
-  async validateProcessStatusIdAfterJobInDB(fileDetails: FileDetails, job: string, expectedProcessStatusId: number): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    const status = await this.getProcessStatusAfterJob(fileDetails);
+  async validateProcessStatusIdAfterJobInDB(
+    fileDetails: FileDetails,
+    job: string,
+    expectedProcessStatusId: number
+  ): Promise<void> {
+    const status = await this.waitFor<ProcessStatusIdResponse>(
+      () => this.getProcessStatusAfterJob(fileDetails),
+      (s) => s.processStatusId.length > 0 && s.processStatusId.every((id) => id === expectedProcessStatusId),
+      { timeoutMs: 90_000, intervalMs: 2_000 }
+    );
     if (status.processStatusId.length === 0) {
       throw new Error(`No registrations found with BatchNumber = ${fileDetails.batchNumber}`);
     }

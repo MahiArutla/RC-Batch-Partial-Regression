@@ -9,7 +9,7 @@ import {
 } from '../utils/fileSystem';
 import {
   generateBatchNumber,
-  generatePartnerReference,
+  generateA8DigitReference,
   generateBmoInputFileName
 } from '../utils/random';
 
@@ -30,7 +30,7 @@ export class NfFileService {
     await copyFile(fileDetails.sampleFile, localFilePath);
 
     fileDetails.batchNumber = generateBatchNumber();
-    fileDetails.partnerReference = generatePartnerReference();
+    fileDetails.partnerReference = generateA8DigitReference();
 
     await updateBatchNumberInTildeFile(localFilePath, fileDetails.batchNumber);
     await updateReferenceNumberInTildeFile(localFilePath, fileDetails.partnerReference);

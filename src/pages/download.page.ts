@@ -118,6 +118,11 @@ export class DownloadPage {
   }
   const targetPath = path.join(artifactsDir, fileDetails.summaryReportFileName);
   await download.saveAs(targetPath);
+
+  // If downloading a ReturnFile, set returnFileName
+  if (fileDetails.downloadFileType === 'ReturnFile') {
+    fileDetails.returnFileName = fileDetails.summaryReportFileName;
+  }
 }
 
 }

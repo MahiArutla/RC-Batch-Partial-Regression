@@ -7,11 +7,13 @@ const env = loadEnv();
 export default defineConfig({
   testDir: './src/tests',
   timeout: 5 * 60 * 1000,
+  retries: 1,
   expect: {
     timeout: 15_000
   },
   outputDir: path.join(__dirname, 'test-results'),
   reporter: [['list'], ['html', { open: 'never' }]],
+  globalSetup: './src/global-setup.ts',
   use: {
     baseURL: env.webAppUrl,
     headless: true,
@@ -20,7 +22,8 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     trace: 'retain-on-failure',
-    acceptDownloads: true
+    acceptDownloads: true,
+    storageState: path.join(__dirname, 'storage', 'admin.json')
   },
   projects: [
     {

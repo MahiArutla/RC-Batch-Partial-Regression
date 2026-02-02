@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Xif-Document Version="1.0" Database="ONCNS9" Direction="Import">
+	<Registration-List>
+			<Registration Type="New">
+			<PPR Province="BC"/>
+			<Partner-Reference>US248812Test1</Partner-Reference>
+			<Contract>
+				<Term Unit="Year">5</Term>
+				<ON.Accounts>YES</ON.Accounts>
+				<Shared-Income>NO</Shared-Income>
+				<ON.Inventory>Yes</ON.Inventory>
+				<ON.Equipment>Yes</ON.Equipment>
+				<ON.Consumer-Goods>No</ON.Consumer-Goods>
+				<ON.Accounts>Yes</ON.Accounts>
+				<ON.Other>Yes</ON.Other>
+				<ON.Veh-Include>Yes</ON.Veh-Include>
+				<Amount>1000000.00</Amount>
+				<Reason-Text>Testing Purpose</Reason-Text>
+			</Contract>
+			<Party-List>
+				<Party Type="Secured-Business">
+					<Address>
+						<Street>4715 Tahoe Blvd</Street>
+						<City>Mississauga</City>
+						<Postal-Code>L4W0B4</Postal-Code>
+						<Province>ON</Province>
+					</Address>
+					<Name>The Bank of Nova Scotia</Name>
+				</Party>
+				<Party Type="Billing">
+					<Bank-Account Owner-Type="Customer">
+						<Bank-Number>0002</Bank-Number>
+						<Transit-Number>20008</Transit-Number>
+						<Account-Number>248020109916</Account-Number>
+					</Bank-Account>
+					<Transit>20008</Transit>
+				</Party>
+				<Party Type="Requesting">
+					<Transit>47696</Transit>
+				</Party>
+				<Party Type="Debtor-Business">
+				<Sync-Id>1</Sync-Id>
+					<Address>
+						<Street>120 Jessup Lane</Street>
+						<City>Bath</City>
+						<Postal-Code>K0H1G0</Postal-Code>
+						<Province>ON</Province>
+					</Address>
+					<Post-Search>
+						<Fax-Number>0000047696</Fax-Number>
+					</Post-Search>
+					<Name>Michael Ranger Physiotherapy Professional Corporation</Name>
+				</Party>
+				<Party Type="Debtor-Individual" >
+				<Sync-Id>2</Sync-Id>
+					<Address>
+						<Street>1045, rue des Pasa</Street>
+						<City>Gatineau </City>
+						<Postal-Code>G1A 7A4</Postal-Code>
+						<Province>QC</Province>
+					</Address>
+					<Post-Search>
+						<Fax-Number>0000003020</Fax-Number>
+					</Post-Search>
+					<First-Name>Thomas</First-Name>
+					<Middle-Name>Reni Thomas</Middle-Name>
+					<Last-Name>A</Last-Name>
+					<Birth-Date Format="yyyy-MM-dd HH:mm:ss">2020-10-16 00:00:00</Birth-Date>
+				</Party>
+				<Party Type="Debtor-Individual" >
+				<Sync-Id>3</Sync-Id>
+					<Address>
+						<Street>1045, rue des Pasa</Street>
+						<City>Gatineau </City>
+						<Postal-Code>G1A 7A4</Postal-Code>
+						<Province>QC</Province>
+					</Address>
+					<Post-Search>
+						<Fax-Number>0000003020</Fax-Number>
+					</Post-Search>
+					<First-Name>Reni</First-Name>
+					<Middle-Name>Thomas K I</Middle-Name>
+					<Last-Name>A</Last-Name>
+					<Birth-Date Format="yyyy-MM-dd HH:mm:ss">2020-10-16 00:00:00</Birth-Date>
+				</Party>
+			</Party-List>
+			<Collaterals>
+				<Collateral Type="General">
+				<Sync-Id>1</Sync-Id>
+					<Description>Test BC</Description>
+				</Collateral>
+				</Collaterals>
+		</Registration>
+	</Registration-List>
+	<Batch Number="202509181">
+		<Date Format="yyyy-MM-dd HH:mm:ss">2024-01-24 11:00:00</Date>
+	</Batch>
+</Xif-Document>

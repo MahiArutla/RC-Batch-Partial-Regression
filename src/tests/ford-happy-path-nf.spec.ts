@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/test';
 import { loadEnv } from '../config/env';
-import { FordOrchestrator } from '../services/fordOrchestrator';
+import { Orchestrator } from '../services/orchestrator';
 
 test.describe('FORD Happy Path NF', () => {
   test('Ford_HappyPath_NF', async ({ page, loginPage }) => {
@@ -11,7 +11,7 @@ test.describe('FORD Happy Path NF', () => {
     });
 
     const scenarioId = 'Ford_HappyPath_NF';
-    const orchestrator = new FordOrchestrator();
+    const orchestrator = new Orchestrator();
     const fileDetails = await test.step('Run Ford NF orchestrator', async () => {
       return orchestrator.runFordHappyPathNF(page, scenarioId);
     });

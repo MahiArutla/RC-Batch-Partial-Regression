@@ -11,6 +11,7 @@ import { FileDetails } from '../models/fileDetails';
 export async function processManualTransaction(fileDetails: FileDetails, jurisdiction: string, apiUser: string) {
   if (!fileDetails.orderId) throw new Error('orderId is required in fileDetails');
   const registrationNumber = generateRegistrationNumber(jurisdiction);
+  fileDetails.baseRegistrationNum = registrationNumber;
   const uri = 'http://aqa1publicapiwebsvcs.cge.dhltd.corp/api/ManualProcessing';
   const request = {
     orderId: Number(fileDetails.orderId),

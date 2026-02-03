@@ -76,7 +76,7 @@ export class HangfireJobsPage {
     await db.validateHandshakeJobStatus(fileDetails);
     console.log('Handshake job status validated in DB');
   }
-  async goToFordHFJobs(db: any, fileDetails: any): Promise<void> {
+  async goToProcessHFJobs(db: any, fileDetails: any): Promise<void> {
     await this.hangfireDashboard.click();
     await this.hfJobs.click();
     // Switch to frame is handled by frameLocator
@@ -84,8 +84,10 @@ export class HangfireJobsPage {
     await this.hfDbRecurringJobsTab.click();
     await this.triggerHFJob('ClientFileScheduler');
     console.log('Triggered ClientFileScheduler Hangfire job');
+     
     await db.validateClientFileSchedulerJobFileStatusInDB(fileDetails);
     console.log('File got picked up from SFTP & File status and process status validated in DB for ClientFileScheduler job ');
+   
     await this.triggerHFJob('File Parsing');
     console.log('Triggered File Parsing Hangfire job');
     await this.triggerHFJob('LVS');
@@ -111,7 +113,7 @@ async goToHFJobsForReturnFile(db: any, fileDetails: any): Promise<void> {
   }
   async triggerHFJob(job: string): Promise<void> {
     try {
-      await this.page.waitForTimeout(1000);
+      await this.page.waitForTimeout(2000);
       const tableText = await this.recurringJobTable.textContent();
       if (!tableText?.includes(job)) {
         await this.nextBtn.click();
@@ -166,7 +168,7 @@ async disableStickyHeader(): Promise<void> {
 
   async scheduledJobsCountMethod(): Promise<void> {
     try {
-      await this.page.waitForTimeout(1000);
+      await this.page.waitForTimeout(2000);
       await this.scheduledJobs.click();
      await this.page.waitForTimeout(2000);
       const schCountText = await this.scheduledJobsCount.textContent();

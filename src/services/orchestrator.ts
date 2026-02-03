@@ -100,7 +100,7 @@ export class Orchestrator {
 
     const db = nfService.getDbService();
     const hangfirePage = new HangfireJobsPage(page);
-    await hangfirePage.goToFordHFJobs(db, fileDetails);
+    await hangfirePage.goToProcessHFJobs(db, fileDetails);
 
     const downloadPage = new DownloadPage(page);
     await downloadPage.setDownloadCriteria(fileDetails);
@@ -137,7 +137,6 @@ export class Orchestrator {
     console.log('Manual Processing API response:', manualResponse);
 
     const downloadPage = new DownloadPage(page);
-    await downloadPage.setDownloadCriteria(fileDetails);
     const downloadDir = process.env.PW_DOWNLOADS_DIR || path.resolve(process.cwd(), 'downloads');
     const testName = scenarioId;
 
@@ -166,7 +165,58 @@ export class Orchestrator {
 
     return fileDetails;
   }
+  async runBnsCommHappyPathDischarge(
+    page: Page,
+    scenarioId: string,
+    registrationNumber: string,
+    partnerReference: string
+  ): Promise<FileDetails> {
+    const fileDetails = loadScenarioData(scenarioId);
+    fileDetails.sampleFile = path.resolve(process.cwd(), 'src', 'data', 'BNS_COMM', 'BNS_Comm_Discharge.xml');
+    fileDetails.scenarioId = scenarioId;
+    fileDetails.partnerReference = partnerReference;
+    fileDetails.baseRegistrationNum = registrationNumber;
+  
+    // Create discharge file using NfService
+    const nfService = new NfService();
+    await nfService.createBnsCommDischargeXml(fileDetails);
+    
+    const db = nfService.getDbService();
+    const hangfirePage = new HangfireJobsPage(page);
+    await hangfirePage.goToProcessHFJobs(db, fileDetails);
+    await db.validateHandshakeJobStatus(fileDetails);
+    console.log('Handshake job status validated in DB');
+    const manualResponse = await processManualTransaction(fileDetails, 'BC', 'superuser');
+    console.log('Manual Processing API response:', manualResponse);
+const downloadPage = new DownloadPage(page);
+    const downloadDir = process.env.PW_DOWNLOADS_DIR || path.resolve(process.cwd(), 'downloads');
+    const testName = scenarioId;
 
+    if (!fileDetails.returnFileDescription) {
+      throw new Error(
+        `ReturnFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the Return UniqueId.`
+      );
+    }
+    await db.setProcessAndFileStatusToNotStartedReturn(fileDetails);
+    await hangfirePage.waitForHangfireReady();
+    await hangfirePage.disableStickyHeader();
+    await hangfirePage.goToHFJobsForReturnFile(db, fileDetails);
+
+    fileDetails.downloadFileType = 'ReturnFile';
+    await downloadPage.setDownloadCriteria(fileDetails);
+    await downloadPage.downloadAndVerify(fileDetails, downloadDir, testName);
+
+    await this.validatePartnerReferenceInReturnFile(fileDetails, testName);
+
+    console.log(
+      `File processed with Batchnumber ${fileDetails.batchNumber}, ` +
+      `filename ${fileDetails.inputFileName}  PartnerReference ${fileDetails.partnerReference} ` +
+      `and OrderId ${fileDetails.orderId}`
+    );
+
+     return fileDetails;
+  }
   // ─────────────────────────────────────────────────────────────────────────────
   // Private helpers
   // ─────────────────────────────────────────────────────────────────────────────

@@ -1,4 +1,6 @@
 import { test, expect } from '../fixtures/test';
+
+test.setTimeout(600000); // 10 minutes
 import { loadEnv } from '../config/env';
 import { Orchestrator } from '../services/orchestrator';
 

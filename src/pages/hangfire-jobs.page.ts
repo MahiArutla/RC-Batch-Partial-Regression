@@ -185,6 +185,7 @@ async disableStickyHeader(): Promise<void> {
     }
   }
 
+
   async processingJobsCount(): Promise<void> {
     let countText = await this.processingJobCount.textContent();
     let countNum = parseInt(countText || '0', 10);

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Xif-Document Version="1.0" Database="ONCNS9" Direction="Import">
+	<Registration-List>
+			<Registration Type="Amendment">
+			<PPR Province="BC"/>
+			<Partner-Reference>MW_4.6RegressionAmdtestingBC</Partner-Reference>
+			<Contract>
+				<Shared-Income>YES</Shared-Income>
+				<Reason-Text> Add Debtor</Reason-Text>
+				<ON.Inventory>No</ON.Inventory>
+				<ON.Equipment>yes</ON.Equipment>
+				<ON.Consumer-Goods>No</ON.Consumer-Goods>
+				<ON.Accounts>yes</ON.Accounts>
+				<ON.Other>No</ON.Other>
+				<ON.Veh-Include>No</ON.Veh-Include>
+			</Contract>
+			<PPR-Registration-Number>281810A</PPR-Registration-Number>
+			<Party-List>
+				<Party Type="Billing">
+					<Bank-Account Owner-Type="Customer">
+						<Bank-Number>0002</Bank-Number>
+						<Transit-Number>20008</Transit-Number>
+						<Account-Number>248020109916</Account-Number>
+					</Bank-Account>
+					<Transit>20008</Transit>
+				</Party>
+				<Party Type="Requesting">
+					<Transit>47696</Transit>
+				</Party>
+				<Party Type="Debtor-Business" Action="Add">
+				<Sync-Id>4</Sync-Id>
+					<Address>
+						<Street>2300 lawrence UNIT 4514</Street>
+						<City>NORTH YORK</City>
+						<Postal-Code>M9M2Y7</Postal-Code>
+						<Province>ON</Province>
+					</Address>
+					<Name>DESIGN Cast PRINTING INC</Name>
+				</Party>
+				<Party Type="Debtor-Individual" Action="Add">
+				<Sync-Id>5</Sync-Id>
+					<Address>
+						<Street>King Arther Street</Street>
+						<City>Gatineau </City>
+						<Postal-Code>G1A 7A4</Postal-Code>
+						<Province>QC</Province>
+					</Address>
+					<Post-Search>
+						<Fax-Number>0000003020</Fax-Number>
+					</Post-Search>
+					<First-Name>Rahul</First-Name>
+					<Middle-Name>Kumar K</Middle-Name>
+					<Last-Name>B</Last-Name>
+					<Birth-Date Format="yyyy-MM-dd HH:mm:ss">2020-10-16 00:00:00</Birth-Date>
+				</Party>
+			</Party-List>
+		</Registration>
+		</Registration-List>
+	<Batch Number="20240607101">
+		<Date Format="yyyy-MM-dd HH:mm:ss">2018-06-29 19:03:02</Date>
+	</Batch>
+</Xif-Document>

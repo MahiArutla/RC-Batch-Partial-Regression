@@ -1,18 +1,4 @@
 {
   "cookies": [],
-  "origins": [
-    {
-      "origin": "http://qa.admin.cd.cge.dhltd.corp",
-      "localStorage": [
-        {
-          "name": "TERANET-DASHBOARD_apiEndpoint",
-          "value": "\"http://qa.admin.cd.cge.dhltd.corp/adminapi/\""
-        },
-        {
-          "name": "TERANET-DASHBOARD_token",
-          "value": "{\"token\":\"eyJhbGciOiJodHRwOi8vd3d3LnczLm9yZy8yMDAxLzA0L3htbGRzaWctbW9yZSNobWFjLXNoYTI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJCcmVudGEuQ2hhcmxlc0B0cmFkZXIuY2EiLCJqdGkiOiIyMjljZWQzOC0xODRiLTRkOTctYjMyNS05MzFmYWJhZGYxNDIiLCJleHAiOjE3Njk4MzQwMzQsImlzcyI6IlRlcmFuZXRfQ0dFQ0QiLCJhdWQiOiJUZXJhbmV0X0NHRUNEIn0.9G_1f10c8YtYNy4Vv-RqnmF0xkbZSEc2wAdA5HMWzAw\",\"expiration\":\"2026-01-30 23:33:54\"}"
-        }
-      ]
-    }
-  ]
+  "origins": []
 }

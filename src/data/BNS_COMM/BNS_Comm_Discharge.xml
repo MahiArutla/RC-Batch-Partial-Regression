@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Xif-Document Version="1.0" Database="ONCNS9" Direction="Import">
+	<Registration-List>
+	<Registration Type="Discharge">
+			<PPR Province="BC"/>
+			<Partner-Reference>BC_MW_4.6RegressionDischargeTest</Partner-Reference>
+			<Contract>
+				<Shared-Income>No</Shared-Income>
+				<Reason-Text>Testing current state -Discharge BC.</Reason-Text>
+			</Contract>
+			<PPR-Registration-Number>840810A</PPR-Registration-Number>
+			 <Party-List>
+        <Party Type="Billing">
+          <Bank-Account Owner-Type="Customer">
+            <Bank-Number>0002</Bank-Number>
+            <Transit-Number>20008</Transit-Number>
+            <Account-Number>248020109916</Account-Number>
+          </Bank-Account>
+          <Transit>20008</Transit>
+        </Party>
+        <Party Type="Requesting">
+          <Transit>47696</Transit>
+        </Party>
+      </Party-List>
+		</Registration>
+	</Registration-List>
+	<Batch Number="20240607102">
+		<Date Format="yyyy-MM-dd HH:mm:ss">2024-01-30 09:11:25</Date>
+	</Batch>
+</Xif-Document>

@@ -80,7 +80,10 @@ export class NfService {
     await copyFile(fileDetails.sampleFile, localFilePath);
 
     fileDetails.batchNumber = generateBatchNumber();
-    fileDetails.partnerReference = generateA8DigitReference();
+    // Only generate partnerReference if not already set (so it can be passed from test for both cycles)
+    if (!fileDetails.partnerReference) {
+      fileDetails.partnerReference = generateA8DigitReference();
+    }
     await updateBatchNumberInXifFile(localFilePath, fileDetails.batchNumber);
     await updatePartnerReferenceInXifFile(localFilePath, fileDetails.partnerReference);
 
@@ -93,6 +96,60 @@ export class NfService {
     await copyFile(localFilePath, targetPath);
     await this.getDbService().setProcessAndFileStatusToNotStarted(fileDetails);
   }
+    async createBnsCommDischargeXml(fileDetails: FileDetails): Promise<void> {
+  
+      // Discharge file creation logic moved from orchestrator
+      const fs = await import('fs/promises');
+      const { updateBatchNumberInXifFile, updatePartnerReferenceInXifFile } = await import('../utils/fileSystem');
+      const { generateBatchNumber } = await import('../utils/random');
+
+      // Use sampleFile as the template path
+      const dischargeTemplatePath = fileDetails.sampleFile;
+      const scenarioArtifactsDir = path.resolve(process.cwd(), 'artifacts', fileDetails.scenarioId);
+      await fs.mkdir(scenarioArtifactsDir, { recursive: true });
+      const dischargeInputFileName = `xifdoc${formatAdjustedTimestamp()}.XML`;
+      const dischargeLocalFilePath = path.join(scenarioArtifactsDir, dischargeInputFileName);
+      await fs.copyFile(dischargeTemplatePath, dischargeLocalFilePath);
+
+      // Update batch number
+      let newBatchNumber = generateBatchNumber();
+      if (newBatchNumber.startsWith('-')) {
+        newBatchNumber = newBatchNumber.replace(/^-+/, '');
+      }
+      await updateBatchNumberInXifFile(dischargeLocalFilePath, newBatchNumber);
+
+      // Update partner reference
+      if (!fileDetails.partnerReference) {
+        throw new Error('partnerReference is undefined');
+      }
+      await updatePartnerReferenceInXifFile(dischargeLocalFilePath, fileDetails.partnerReference);
+
+      // Update PPR-Registration-Number
+      let dischargeContent = await fs.readFile(dischargeLocalFilePath, 'utf-8');
+      if (fileDetails.baseRegistrationNum) {
+        if (dischargeContent.match(/<PPR-Registration-Number>.*<\/PPR-Registration-Number>/i)) {
+          dischargeContent = dischargeContent.replace(/(<PPR-Registration-Number>)[^<]*(<\/PPR-Registration-Number>)/i, `$1${fileDetails.baseRegistrationNum}$2`);
+        } else if (dischargeContent.match(/<PPR-Registration-Number\s*\/?>(?!<)/i)) {
+          dischargeContent = dischargeContent.replace(/<PPR-Registration-Number\s*\/?>(?!<)/i, `<PPR-Registration-Number>${fileDetails.baseRegistrationNum}</PPR-Registration-Number>`);
+        }
+        await fs.writeFile(dischargeLocalFilePath, dischargeContent, 'utf-8');
+      } else {
+        throw new Error('baseRegistrationNum from cycle 1 is undefined');
+      }
+
+      // Update fileDetails for SFTP upload
+      fileDetails.sampleFile = dischargeLocalFilePath;
+      fileDetails.batchNumber = newBatchNumber;
+     
+      fileDetails.inputFileName = dischargeInputFileName;
+      const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', dischargeInputFileName);
+    
+     const targetDir = path.dirname(targetPath);
+    await ensureDirectory(targetDir);
+    await clearDirectory(targetDir);
+    await copyFile(dischargeLocalFilePath, targetPath);
+    await this.getDbService().setProcessAndFileStatusToNotStarted(fileDetails);
+    }
 
   // Dispatcher based on client or sample extension
   async createNfFile(fileDetails: FileDetails): Promise<void> {

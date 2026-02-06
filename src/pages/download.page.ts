@@ -88,9 +88,16 @@ export class DownloadPage {
       return isNaN(num) ? 0 : num;
     }, {
       timeout: 30000,
-      message: 'Waiting for search results to load',
+      message: 'Waiting for search results to load. Ensure that the search criteria are correct and that the file exists in the table.',
     })
     .toBeGreaterThan(0);
+
+  if (count === 0) {
+    throw new Error(
+      `No search results found for file: ${fileDetails.inputFileName}. ` +
+      `Please verify that the file exists and the search criteria are correct.`
+    );
+  }
 
   // Download first row
   const [download] = await Promise.all([

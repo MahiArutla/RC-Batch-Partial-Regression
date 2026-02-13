@@ -23,8 +23,8 @@ export function loadEnv(): EnvConfig {
 
   cachedEnv = {
     webAppUrl: process.env.WEB_APP_URL ?? 'http://qa.admin.cd.cge.dhltd.corp',
-    adminUser: process.env.ADMIN_USER ?? 'Brenta.Charles@trader.ca',
-    adminPassword: process.env.ADMIN_PASSWORD ?? 'Trader1!',
+    adminUser: process.env.ADMIN_USER ?? 'RCBATCHAUTOUSER@trader.ca',
+    adminPassword: process.env.ADMIN_PASSWORD ?? 'Password1!',
     dbConnectionString: process.env.DB_CONNECTION_STRING ?? 'Server=MRKREGDBVWQA43.DHLTD.CORP,1558;Database=CGE_MIDDLEWARE_QA;User Id=MWQAUser;Password=G8n!Zp4Qv2@Hk7Lm;Encrypt=true;TrustServerCertificate=true;',
     sftpRoot: process.env.SFTP_ROOT ?? '\\\\cms_uat_ftp_non_pci.dhltd.corp\\cms_uat_ftp_non_pci\\CMSUATNONPCI\\Usr\\cgecd_qa2',
     downloadDirectory: process.env.DOWNLOAD_DIRECTORY ?? path.resolve(process.cwd(), 'downloads'),

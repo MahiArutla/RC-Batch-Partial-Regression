@@ -1,4 +1,5 @@
 import { Page, Locator, FrameLocator } from '@playwright/test';
+import { expect } from '../fixtures/test';
 
 const HANGFIRE_IFRAME = "//iframe[contains(@src,'hangfiredashboard')]";
 
@@ -48,10 +49,9 @@ export class HangfireJobsPage {
   async goToHFJobs(db: any, fileDetails: any): Promise<void> {
     await this.hangfireDashboard.click();
     await this.hfJobs.click();
-    // Switch to frame is handled by frameLocator
-    await this.hfDashboardTab.click();
+     await this.hfDashboardTab.click();
     await this.hfDbRecurringJobsTab.click();
-    await this.triggerHFJob('ClientFileScheduler');
+    await this.triggerHFJobWithEnqueue('ClientFileScheduler');
     console.log('Triggered ClientFileScheduler Hangfire job');
     await db.validateClientFileSchedulerJobFileStatusInDB(fileDetails);
     console.log('File got picked up from SFTP & File status and process status validated in DB for ClientFileScheduler job ');
@@ -67,7 +67,7 @@ export class HangfireJobsPage {
     console.log('Triggered Create JSON Hangfire job');
     await db.validateProcessStatusIdAfterJobInDB(fileDetails, 'Create JSON', 280);
     console.log('Process status validated in DB for Create JSON job ');
-    await this.triggerHFJob('SendToCGe');
+    await this.triggerHFJobWithEnqueue('SendToCGe');
     console.log('Triggered SendToCGe Hangfire job');
     await db.validateProcessStatusIdAfterJobInDB(fileDetails, 'SendToCGe', 350);
     console.log('Process status validated in DB for SendToCGe job ');
@@ -82,7 +82,7 @@ export class HangfireJobsPage {
     // Switch to frame is handled by frameLocator
     await this.hfDashboardTab.click();
     await this.hfDbRecurringJobsTab.click();
-    await this.triggerHFJob('ClientFileScheduler');
+    await this.triggerHFJobWithEnqueue('ClientFileScheduler');
     console.log('Triggered ClientFileScheduler Hangfire job');
      
     await db.validateClientFileSchedulerJobFileStatusInDB(fileDetails);
@@ -100,43 +100,54 @@ export class HangfireJobsPage {
     console.log('Triggered Handshake Hangfire job');
      }
 async goToHFJobsForReturnFile(db: any, fileDetails: any): Promise<void> {
+  
     await this.hangfireDashboard.click();
     await this.hfJobs.click();
     // Switch to frame is handled by frameLocator
     await this.hfDashboardTab.click();
     await this.hfDbRecurringJobsTab.click();
-    await this.triggerHFJob('FileClientProcessReadyApi');
+    await this.triggerHFJobWithEnqueue('FileClientProcessReadyApi');
     console.log('Triggered FileClientProcessReadyApi Hangfire job');
-    await this.triggerHFJob('ClientFileScheduler');
+    await this.triggerHFJobWithEnqueue('ClientFileScheduler');
     console.log('Triggered ClientFileScheduler Hangfire job');
-   
+    await this.triggerHFJobWithEnqueue('ClientFileScheduler');
+    console.log('Triggered ClientFileScheduler Hangfire job');
   }
   async triggerHFJob(job: string): Promise<void> {
     try {
-      await this.page.waitForTimeout(2000);
       const tableText = await this.recurringJobTable.textContent();
       if (!tableText?.includes(job)) {
         await this.nextBtn.click();
       }
-      await this.page.waitForTimeout(1000);
       const jobElement = this.hangfireFrame.locator(`//div[@class='js-jobs-list']/div[2]/table/tbody/tr/td/input[@value='${job}']`);
-      await jobElement.click();
-      await this.page.waitForTimeout(1000);
-      await this.checkScheduledProcessingHFJobCount();
-      await this.page.waitForTimeout(1000);
-      await this.hangfireFrame.locator("//a[contains(text(),'Recurring Jobs')]").click();
-      await this.page.waitForTimeout(1000);
-    } catch (error) {
+      await expect(jobElement).toBeEnabled();
+      await jobElement.click(); 
+      const TriggerNowBttn = this.hangfireFrame.locator(`//button[normalize-space()='Trigger now']`);
+       await expect(TriggerNowBttn).toBeEnabled();
+      await TriggerNowBttn.click(); 
+     await this.page.waitForTimeout(1000);
+        } catch (error) {
       console.log(error);
     }
   }
-
+ async triggerHFJobWithEnqueue(job: string): Promise<void> {
+    try {
+      const tableText = await this.recurringJobTable.textContent();
+      if (!tableText?.includes(job)) {
+        await this.nextBtn.click();
+      }
+      const jobElement = this.hangfireFrame.locator(`//div[@class='js-jobs-list']/div[2]/table/tbody/tr/td/input[@value='${job}']`);
+      await jobElement.click();
+      await this.checkScheduledProcessingHFJobCount();
+      await this.hangfireFrame.locator("//a[contains(text(),'Recurring Jobs')]").click();
+       } catch (error) {
+      console.log(error);
+    }
+  }
   async checkScheduledProcessingHFJobCount(): Promise<void> {
-    await this.page.waitForTimeout(2000);
-    await this.triggerNow.scrollIntoViewIfNeeded();
-    await this.page.waitForTimeout(1000);
+   // await this.triggerNow.scrollIntoViewIfNeeded();
     await this.triggerNow.click();
-    await this.page.waitForTimeout(1000);
+     await this.page.waitForTimeout(1000);
     await this.hangFireJobs.click();
     await this.page.waitForTimeout(1000);
     for (let i = 0; i < 3; i++) {
@@ -168,15 +179,15 @@ async disableStickyHeader(): Promise<void> {
 
   async scheduledJobsCountMethod(): Promise<void> {
     try {
-      await this.page.waitForTimeout(2000);
+       await expect(this.scheduledJobs).toBeEnabled();
+      
       await this.scheduledJobs.click();
-     await this.page.waitForTimeout(2000);
       const schCountText = await this.scheduledJobsCount.textContent();
       const schCountVal = parseInt(schCountText || '0', 10);
       if (schCountVal > 0) {
-        await this.page.waitForTimeout(2000);
+         await expect(this.enqueuedJobsSelectAllCheckbox).toBeEnabled();
+     await this.page.waitForTimeout(2000);
         await this.enqueuedJobsSelectAllCheckbox.click();
-        await this.page.waitForTimeout(2000);
         await this.enqueuedJobsTriggerButton.click();
         await this.page.waitForTimeout(2000);
       }
@@ -190,7 +201,7 @@ async disableStickyHeader(): Promise<void> {
     let countText = await this.processingJobCount.textContent();
     let countNum = parseInt(countText || '0', 10);
     while (countNum > 0) {
-      await this.page.waitForTimeout(2000);
+      //await this.page.waitForTimeout(2000);
       countText = await this.processingJobCount.textContent();
       countNum = parseInt(countText || '0', 10);
     }

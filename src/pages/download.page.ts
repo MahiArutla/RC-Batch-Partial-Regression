@@ -79,18 +79,20 @@ export class DownloadPage {
   await this.searchInTable.fill(fileDetails.inputFileName ?? '');
 
   // ⏳ Wait for grid to refresh & results to appear
-  const count = await expect
-    .poll(async () => {
-      const text = await this.fileTableResultCount.textContent();
-      if (!text) return 0;
+  await expect.poll(async () => {
+    const text = await this.fileTableResultCount.textContent();
+    if (!text) return 0;
 
-      const num = parseInt(text.split(' total')[0].trim());
-      return isNaN(num) ? 0 : num;
-    }, {
-      timeout: 30000,
-      message: 'Waiting for search results to load. Ensure that the search criteria are correct and that the file exists in the table.',
-    })
-    .toBeGreaterThan(0);
+    const num = parseInt(text.split(' total')[0].trim());
+    return isNaN(num) ? 0 : num;
+  }, {
+    timeout: 30000,
+    message: 'Waiting for search results to load. Ensure that the search criteria are correct and that the file exists in the table.',
+  }).toBeGreaterThan(0);
+
+  // Get the final count value after polling succeeds
+  const text = await this.fileTableResultCount.textContent();
+  const count = text ? parseInt(text.split(' total')[0].trim()) : 0;
 
   if (count === 0) {
     throw new Error(

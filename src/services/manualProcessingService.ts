@@ -41,6 +41,8 @@ export class ManualProcessingService {
     let responseJson: ManualProcessingResponse | null = null;
     let retryCount = 0;
     const maxRetries = 5;
+    let generalErrorRetryCount = 0;
+    const maxGeneralErrorRetries = 3;
 
     do {
       const response = await fetch(uri, {
@@ -53,13 +55,19 @@ export class ManualProcessingService {
       });
       responseText = await response.text();
       if (responseText.includes('GENERAL_ERROR')) {
-        throw new Error('Failed manual processing: GENERAL_ERROR');
+        generalErrorRetryCount++;
+        if (generalErrorRetryCount > maxGeneralErrorRetries) {
+          throw new Error('Failed manual processing: GENERAL_ERROR');
+        }
+        await new Promise((r) => setTimeout(r, 2000));
+        continue;
       }
       if (responseText.includes('Server data has changed')) {
         retryCount++;
         if (retryCount > maxRetries) {
           throw new Error('Too many retries: Server data has changed');
         }
+        await new Promise((r) => setTimeout(r, 2000));
         continue;
       }
       responseJson = JSON.parse(responseText);

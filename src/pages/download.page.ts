@@ -75,8 +75,12 @@ export class DownloadPage {
   }
 
   async downloadAndVerify(fileDetails: FileDetails, downloadDir: string, testName: string) {
-  // Search for the file in the table
-  await this.searchInTable.fill(fileDetails.inputFileName ?? '');
+  // Search for the most stable identifier available for this file type.
+  const searchValue =
+    fileDetails.downloadFileType === 'ReturnFile'
+      ? (fileDetails.batchNumber ?? fileDetails.partnerReference ?? fileDetails.inputFileName ?? '')
+      : (fileDetails.inputFileName ?? '');
+  await this.searchInTable.fill(searchValue);
 
   // ⏳ Wait for grid to refresh & results to appear
   await expect.poll(async () => {
@@ -96,7 +100,7 @@ export class DownloadPage {
 
   if (count === 0) {
     throw new Error(
-      `No search results found for file: ${fileDetails.inputFileName}. ` +
+      `No search results found for search value: ${searchValue}. ` +
       `Please verify that the file exists and the search criteria are correct.`
     );
   }

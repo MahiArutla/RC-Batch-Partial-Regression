@@ -110,8 +110,6 @@ async goToHFJobsForReturnFile(db: any, fileDetails: any): Promise<void> {
     console.log('Triggered FileClientProcessReadyApi Hangfire job');
     await this.triggerHFJobWithEnqueue('ClientFileScheduler');
     console.log('Triggered ClientFileScheduler Hangfire job');
-    await this.triggerHFJobWithEnqueue('ClientFileScheduler');
-    console.log('Triggered ClientFileScheduler Hangfire job');
   }
   async triggerHFJob(job: string): Promise<void> {
     try {

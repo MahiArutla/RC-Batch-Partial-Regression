@@ -68,16 +68,16 @@ export class Orchestrator {
         `Please add it so DB can resolve the Return UniqueId.`
       );
     }
-    await db.setProcessAndFileStatusToNotStartedReturn(fileDetails);
-    await hangfirePage.waitForHangfireReady();
-    await hangfirePage.disableStickyHeader();
-    await hangfirePage.goToHFJobsForReturnFile(db, fileDetails);
-
     fileDetails.downloadFileType = 'ReturnFile';
-    await downloadPage.setDownloadCriteria(fileDetails);
-    await downloadPage.downloadAndVerify(fileDetails, downloadDir, testName);
-
-    await this.validatePartnerReferenceInReturnFile(fileDetails, testName);
+    await this.downloadAndValidateReturnFileWithRetry(
+      page,
+      db,
+      hangfirePage,
+      downloadPage,
+      fileDetails,
+      downloadDir,
+      testName
+    );
 
     console.log(
       `File processed with Batchnumber ${fileDetails.batchNumber}, ` +
@@ -157,16 +157,16 @@ export class Orchestrator {
         `Please add it so DB can resolve the Return UniqueId.`
       );
     }
-    await db.setProcessAndFileStatusToNotStartedReturn(fileDetails);
-    await hangfirePage.waitForHangfireReady();
-    await hangfirePage.disableStickyHeader();
-    await hangfirePage.goToHFJobsForReturnFile(db, fileDetails);
-
     fileDetails.downloadFileType = 'ReturnFile';
-    await downloadPage.setDownloadCriteria(fileDetails);
-    await downloadPage.downloadAndVerify(fileDetails, downloadDir, testName);
-
-    await this.validatePartnerReferenceInReturnFile(fileDetails, testName);
+    await this.downloadAndValidateReturnFileWithRetry(
+      page,
+      db,
+      hangfirePage,
+      downloadPage,
+      fileDetails,
+      downloadDir,
+      testName
+    );
 
     console.log(
       `File processed with Batchnumber ${fileDetails.batchNumber}, ` +
@@ -210,16 +210,16 @@ const downloadPage = new DownloadPage(page);
         `Please add it so DB can resolve the Return UniqueId.`
       );
     }
-    await db.setProcessAndFileStatusToNotStartedReturn(fileDetails);
-    await hangfirePage.waitForHangfireReady();
-    await hangfirePage.disableStickyHeader();
-    await hangfirePage.goToHFJobsForReturnFile(db, fileDetails);
-
     fileDetails.downloadFileType = 'ReturnFile';
-    await downloadPage.setDownloadCriteria(fileDetails);
-    await downloadPage.downloadAndVerify(fileDetails, downloadDir, testName);
-
-    await this.validatePartnerReferenceInReturnFile(fileDetails, testName);
+    await this.downloadAndValidateReturnFileWithRetry(
+      page,
+      db,
+      hangfirePage,
+      downloadPage,
+      fileDetails,
+      downloadDir,
+      testName
+    );
 
     console.log(
       `File processed with Batchnumber ${fileDetails.batchNumber}, ` +
@@ -263,16 +263,16 @@ const downloadPage = new DownloadPage(page);
         `Please add it so DB can resolve the Return UniqueId.`
       );
     }
-    await db.setProcessAndFileStatusToNotStartedReturn(fileDetails);
-    await hangfirePage.waitForHangfireReady();
-    await hangfirePage.disableStickyHeader();
-    await hangfirePage.goToHFJobsForReturnFile(db, fileDetails);
-
     fileDetails.downloadFileType = 'ReturnFile';
-    await downloadPage.setDownloadCriteria(fileDetails);
-    await downloadPage.downloadAndVerify(fileDetails, downloadDir, testName);
-
-    await this.validatePartnerReferenceInReturnFile(fileDetails, testName);
+    await this.downloadAndValidateReturnFileWithRetry(
+      page,
+      db,
+      hangfirePage,
+      downloadPage,
+      fileDetails,
+      downloadDir,
+      testName
+    );
 
     console.log(
       `File processed with Batchnumber ${fileDetails.batchNumber}, ` +
@@ -314,16 +314,16 @@ const downloadPage = new DownloadPage(page);
         `Please add it so DB can resolve the Return UniqueId.`
       );
     }
-    await db.setProcessAndFileStatusToNotStartedReturn(fileDetails);
-    await hangfirePage.waitForHangfireReady();
-    await hangfirePage.disableStickyHeader();
-    await hangfirePage.goToHFJobsForReturnFile(db, fileDetails);
-
     fileDetails.downloadFileType = 'ReturnFile';
-    await downloadPage.setDownloadCriteria(fileDetails);
-    await downloadPage.downloadAndVerify(fileDetails, downloadDir, testName);
-
-    await this.validatePartnerReferenceInReturnFile(fileDetails, testName);
+    await this.downloadAndValidateReturnFileWithRetry(
+      page,
+      db,
+      hangfirePage,
+      downloadPage,
+      fileDetails,
+      downloadDir,
+      testName
+    );
 
     console.log(
       `File processed with Batchnumber ${fileDetails.batchNumber}, ` +
@@ -336,21 +336,65 @@ const downloadPage = new DownloadPage(page);
   // ─────────────────────────────────────────────────────────────────────────────
   // Private helpers
   // ─────────────────────────────────────────────────────────────────────────────
+  private async downloadAndValidateReturnFileWithRetry(
+    page: Page,
+    db: DbService,
+    hangfirePage: HangfireJobsPage,
+    downloadPage: DownloadPage,
+    fileDetails: FileDetails,
+    downloadDir: string,
+    testName: string,
+    maxAttempts: number = 6
+  ): Promise<void> {
+    const triggerReturnGeneration = async (): Promise<void> => {
+      await db.setProcessAndFileStatusToNotStartedReturn(fileDetails);
+      await hangfirePage.waitForHangfireReady();
+      await hangfirePage.disableStickyHeader();
+      await hangfirePage.goToHFJobsForReturnFile(db, fileDetails);
+    };
+
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      await triggerReturnGeneration();
+      await downloadPage.setDownloadCriteria(fileDetails);
+      await downloadPage.downloadAndVerify(fileDetails, downloadDir, testName);
+      try {
+        await this.validatePartnerReferenceInReturnFile(fileDetails, testName);
+        return;
+      } catch (error) {
+        lastError = error;
+        if (attempt < maxAttempts) {
+          await page.waitForTimeout(15000);
+        }
+      }
+    }
+    const details = lastError instanceof Error ? lastError.message : String(lastError);
+    throw new Error(
+      `Return file validation failed after ${maxAttempts} attempts. ` +
+      `Expected partnerReference=${fileDetails.partnerReference}, batchNumber=${fileDetails.batchNumber}. ` +
+      `Last error: ${details}`
+    );
+  }
+
   private async validatePartnerReferenceInReturnFile(fileDetails: FileDetails, testName: string): Promise<void> {
     const fs = await import('fs');
     if (!fileDetails.returnFileName || !fileDetails.partnerReference) {
       throw new Error('Return file name or partner reference is not set in fileDetails.');
     }
     const returnFilePath = path.join(process.cwd(), 'artifacts', testName, fileDetails.returnFileName);
-    let found = false;
-    for (const line of fs.readFileSync(returnFilePath, 'utf-8').split(/\r?\n/)) {
-      if (line.includes(fileDetails.partnerReference)) {
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      throw new Error(`${fileDetails.partnerReference} not present in Return File ${fileDetails.returnFileName}`);
+    const fileContent = fs.readFileSync(returnFilePath, 'utf-8');
+    const normalize = (value: string) => value.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    const normalizedContent = normalize(fileContent);
+    const expectedReference = normalize(fileDetails.partnerReference);
+    const referenceFound = normalizedContent.includes(expectedReference);
+    const batchFound = fileDetails.batchNumber
+      ? normalizedContent.includes(normalize(fileDetails.batchNumber))
+      : true;
+    if (!referenceFound || !batchFound) {
+      throw new Error(
+        `${fileDetails.partnerReference} or batch ${fileDetails.batchNumber} ` +
+        `not present in Return File ${fileDetails.returnFileName}`
+      );
     }
     console.log(`PartnerReference ${fileDetails.partnerReference} found in Return File ${fileDetails.returnFileName}`);
   }

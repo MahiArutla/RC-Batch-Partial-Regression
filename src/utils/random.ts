@@ -1,14 +1,7 @@
 import crypto from 'crypto';
 
 function randomInt(min: number, max: number): number {
-  const range = max - min + 1;
-  const bytesNeeded = Math.ceil(Math.log2(range) / 8);
-  const randomBytes = crypto.randomBytes(bytesNeeded);
-  let value = 0;
-  for (let i = 0; i < bytesNeeded; i += 1) {
-    value = (value << 8) + randomBytes[i];
-  }
-  return min + (value % range);
+  return crypto.randomInt(min, max + 1);
 }
 
 export function generateBatchNumber(): string {

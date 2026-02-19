@@ -355,16 +355,18 @@ const downloadPage = new DownloadPage(page);
 
     let lastError: unknown;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      await triggerReturnGeneration();
+    
       await downloadPage.setDownloadCriteria(fileDetails);
       await downloadPage.downloadAndVerify(fileDetails, downloadDir, testName);
       try {
         await this.validatePartnerReferenceInReturnFile(fileDetails, testName);
         return;
       } catch (error) {
+         
         lastError = error;
         if (attempt < maxAttempts) {
           await page.waitForTimeout(15000);
+           await triggerReturnGeneration();
         }
       }
     }

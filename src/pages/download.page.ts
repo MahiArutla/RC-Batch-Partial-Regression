@@ -104,38 +104,132 @@ export class DownloadPage {
       `Please verify that the file exists and the search criteria are correct.`
     );
   }
+  let targetRowLocator;
+  let summaryReportFileName;
+  const filePrefixRegex = /ClientSummaryReport_/;
 
-  // Download first row
-  const [download] = await Promise.all([
-    this.page.waitForEvent('download'),
-    this.downloadFileIcon.first().click(),
-  ]);
 
-  // Capture file name from table
-  const summaryReportFileName = await this.page
-    .locator(this.fileTableSummaryReportFileName)
-    .first()
-    .textContent();
+  const row = this.page
+    .locator('datatable-body-row')
+    .filter({ hasText: filePrefixRegex })
+    .first();
 
-  fileDetails.summaryReportFileName = summaryReportFileName?.trim();
+  await row.waitFor({ state: 'visible', timeout: 10000 });
 
-  if (!fileDetails.summaryReportFileName) {
-    throw new Error('Summary report filename not found in table.');
+  const fileNameLocator = row.getByText(filePrefixRegex);
+  const rawName = (await fileNameLocator.textContent())?.trim();
+  if (!rawName) {
+    throw new Error('ClientSummaryReport_ filename found in row but unable to read text.');
   }
 
+  targetRowLocator = row;
+  summaryReportFileName = rawName;
+
+  fileDetails.summaryReportFileName = summaryReportFileName;
+
+  const [download] = await Promise.all([
+    this.page.waitForEvent('download'),
+    targetRowLocator.locator('fa-icon#edit[icon="download"], fa-icon[icon="download"]').click(),
+  ]);
   const path = await import('path');
   const artifactsDir = path.join(process.cwd(), 'artifacts', testName);
   const fs = await import('fs');
   if (!fs.existsSync(artifactsDir)) {
     fs.mkdirSync(artifactsDir, { recursive: true });
   }
+  if (!fileDetails.summaryReportFileName) {
+    throw new Error('summaryReportFileName is undefined. Could not find the file name in the table row.');
+  }
   const targetPath = path.join(artifactsDir, fileDetails.summaryReportFileName);
   await download.saveAs(targetPath);
 
-  // If downloading a ReturnFile, set returnFileName
   if (fileDetails.downloadFileType === 'ReturnFile') {
     fileDetails.returnFileName = fileDetails.summaryReportFileName;
   }
 }
+async downloadAndVerifyReturnFile(
+  fileDetails: FileDetails,
+  downloadDir: string,
+  testName: string
+) {
+
+
+  // 2) Wait for results count > 0
+  await expect
+    .poll(
+      async () => {
+        const text = (await this.fileTableResultCount.textContent())?.trim();
+        if (!text) return 0;
+
+        const num = parseInt(text.split(' total')[0].trim(), 10);
+        return Number.isNaN(num) ? 0 : num;
+      },
+      {
+        timeout: 30000,
+        message:
+          'Waiting for search results to load. Ensure search criteria are correct and the file exists in the table.',
+      }
+    )
+    .toBeGreaterThan(0);
+
+  // 3) Select the FIRST row (you said: always download the first one)
+  const row = this.page.locator('datatable-body-row').first();
+  await row.waitFor({ state: 'visible', timeout: 10000 });
+  await row.scrollIntoViewIfNeeded();
+
+  // 4) Read file name from the "File Name" column (3rd column = nth(2))
+  const fileNameLocator = row
+    .locator('datatable-body-cell')
+    .nth(2)
+    .locator('.datatable-body-cell-label');
+
+  await expect(fileNameLocator).toBeVisible({ timeout: 5000 });
+
+  const rawName = (await fileNameLocator.innerText()).trim();
+ 
+
+  fileDetails.summaryReportFileName = rawName;
+
+  // 5) Click download icon in the same row and wait for download
+  const downloadIcon = row.locator('fa-icon[icon="download"]').first();
+  await expect(downloadIcon).toBeVisible({ timeout: 5000 });
+
+  const [download] = await Promise.all([
+    this.page.waitForEvent('download'),
+    downloadIcon.click(),
+  ]);
+
+  // 6) Prepare artifacts directory
+  const path = await import('path');
+  const fs = await import('fs');
+
+  const artifactsDir = path.join(
+    process.cwd(),
+    'artifacts',
+    testName
+  );
+  if (!fs.existsSync(artifactsDir)) {
+    fs.mkdirSync(artifactsDir, { recursive: true });
+  }
+
+ 
+  // 7) Save file (prefer table name; fallback to suggested filename)
+  const finalName = fileDetails.summaryReportFileName || download.suggestedFilename();
+  if (!finalName) {
+    throw new Error('Could not determine a filename for the downloaded artifact.');
+  }
+
+  const targetPath = path.join(artifactsDir, finalName);
+  await download.saveAs(targetPath);
+
+  // 8) Update fileDetails for return file type
+  if (fileDetails.downloadFileType === 'ReturnFile') {
+    fileDetails.returnFileName = finalName;
+  }
+
+  return targetPath;
+}
+
+
 
 }

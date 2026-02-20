@@ -158,7 +158,7 @@ export class DbService {
     if (!row) {
       throw new Error('RegistrationCGeJson row not found for handshake validation.');
     }
-    if (row.HTTPStatusCode !== 'Created' || row.ImportOrderStatus !== 'Submitted') {
+    if (row.HTTPStatusCode !== 'Created' || (row.ImportOrderStatus !== 'Submitted' && row.ImportOrderStatus !== 'Imported')) {
       throw new Error(
         `Handshake validation failed. HTTPStatusCode=${row.HTTPStatusCode}, ImportOrderStatus=${row.ImportOrderStatus}`
       );

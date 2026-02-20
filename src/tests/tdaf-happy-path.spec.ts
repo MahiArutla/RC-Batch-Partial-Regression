@@ -3,8 +3,8 @@ import { LoginPage } from '../pages/login.page';
 import { loadEnv } from '../config/env';
 import { Orchestrator } from '../services/orchestrator';
 
-test.describe('GBC All Province Happy Path', () => {
-  test('GBC NF smoke', async ({ page, loginPage }) => {
+test.describe('TDAF All Province Happy Path', () => {
+  test('TDAF NF smoke', async ({ page, loginPage }) => {
     const env = loadEnv();
     await test.step('Login to web app', async () => {
       await loginPage.goto(env.webAppUrl);
@@ -12,10 +12,10 @@ test.describe('GBC All Province Happy Path', () => {
     });
     console.log('Logged into web application');
 
-    const scenarioId = 'GBC_AllProvinceHappyPath';
+    const scenarioId = 'TDAF_HappyPath_NF';
     const orchestrator = new Orchestrator();
     const fileDetails = await test.step('Run orchestrator path', async () => {
-      return orchestrator.runHappyPath(page, scenarioId, 'GBC', 'GBC_NF.XIF', scenarioId, 'YT', true);
+      return orchestrator.runHappyPath(page, scenarioId, 'TDAF', 'TDAF_NF', scenarioId, 'BC', false);
     });
 
     await test.step('Validate unique id present', async () => {

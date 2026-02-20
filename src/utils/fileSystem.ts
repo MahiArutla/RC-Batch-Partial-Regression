@@ -188,8 +188,30 @@ function formatAdjustedTimestamp(): string {
   return `_${yyyy}-${MM}-${dd}_${HH}-${mm}-${ss}_${f}`;
 }
 
-function buildGbcFileName(): string {
-  return `PPtoDH_${formatTimestamp()}.XIF`;
+function formatTimestampWithMillis(): string {
+  const d = new Date();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  const yyyy = d.getFullYear();
+  const MM = pad(d.getMonth() + 1);
+  const dd = pad(d.getDate());
+  const hh = pad(d.getHours());
+  const mm = pad(d.getMinutes());
+  const ss = pad(d.getSeconds());
+  const fff = d.getMilliseconds().toString().padStart(3, '0');
+  return `${yyyy}${MM}${dd}${hh}${mm}${ss}${fff}`;
+}
+
+function buildNfFileName(fileDetails: FileDetails): string {
+  switch (fileDetails.client.toUpperCase()) {
+    case 'GBC':
+      return `PPtoDH_${formatTimestamp()}.XIF`;
+    case 'TDAF':
+      return `TDC50toPPSA.${formatTimestampWithMillis()}.XIF`;
+    case 'FORD':
+      return `FORD_NF_${formatTimestamp()}.FC`;
+    default:
+      return `DEFAULT_${formatTimestamp()}.XIF`;
+  }
 }
 
 function buildSftpTarget(fileInfo: string, fileName: string): string {
@@ -198,6 +220,8 @@ function buildSftpTarget(fileInfo: string, fileName: string): string {
       return path.join(env.sftpRoot, 'GBC', 'in', fileName);
     case 'BMO':
       return path.join(env.sftpRoot, 'BMO', 'in', fileName);
+       case 'TDAF':
+      return path.join(env.sftpRoot, 'tdaf', 'in', fileName);
     default:
       throw new Error(`Client Format not found for ${fileInfo}`);
   }
@@ -219,11 +243,11 @@ function buildSftpPathForClient(client: string, fileName: string): string {
 // File creation functions (formerly from inputFileCreation, nfFileService, nfService)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function createGbcNfFile(fileDetails: FileDetails): Promise<FileDetails> {
+export async function updateNfFile(fileDetails: FileDetails): Promise<FileDetails> {
   const scenarioArtifactsDir = path.join(process.cwd(), 'artifacts', fileDetails.scenarioId);
   await ensureDirectory(scenarioArtifactsDir);
 
-  const inputFileName = buildGbcFileName();
+  const inputFileName = buildNfFileName(fileDetails);
   const sourceFilePath = path.join(scenarioArtifactsDir, inputFileName);
   await copyFile(fileDetails.sampleFile, sourceFilePath);
 
@@ -265,10 +289,10 @@ export async function createNfFileTilde(fileDetails: FileDetails): Promise<void>
   fileDetails.inputFileName = localFileName;
 }
 
-export async function createGbcNfXif(fileDetails: FileDetails): Promise<void> {
+export async function createNfFile(fileDetails: FileDetails): Promise<void> {
   fileDetails.batchNumber = generateBatchNumber();
   fileDetails.partnerReference = generateA8DigitReference();
-  await createGbcNfFile(fileDetails);
+  await updateNfFile(fileDetails);
 }
 
 export async function createFordNfFc(fileDetails: FileDetails): Promise<void> {
@@ -375,11 +399,15 @@ export async function createBnsCommDischargeXml(fileDetails: FileDetails): Promi
   await copyFile(dischargeLocalFilePath, targetPath);
 }
 
-export async function createNfFile(fileDetails: FileDetails): Promise<void> {
+export async function createNfFileByClient(fileDetails: FileDetails): Promise<void> {
   const ext = (path.extname(fileDetails.sampleFile || '') || '').toLowerCase();
   const client = (fileDetails.client || '').toUpperCase();
   if (client === 'GBC' || ext === '.xif') {
-    return createGbcNfXif(fileDetails);
+    return createNfFile(fileDetails);
+  }
+  if (client === 'TDAF' ) {
+
+     return createNfFile(fileDetails);
   }
   if (client === 'FORD' || ext === '.fc') {
     return createFordNfFc(fileDetails);
@@ -388,6 +416,6 @@ export async function createNfFile(fileDetails: FileDetails): Promise<void> {
     return createBnsCommNfXml(fileDetails);
   }
   // default to XIF path
-  return createGbcNfXif(fileDetails);
+  return createNfFile(fileDetails);
 }
 

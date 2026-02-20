@@ -21,12 +21,14 @@ export class Orchestrator {
   // ─────────────────────────────────────────────────────────────────────────────
   // GBC Happy Path NF
   // ─────────────────────────────────────────────────────────────────────────────
-  async runGbcAllProvinceHappyPath(
+  async runHappyPath(
     page: Page,
     scenarioId: string,
     client: string,
     sampleFileName: string,
-    testName: string = 'GBC_AllProvinceHappyPath'
+    testName: string,
+    province: string,
+    returnFileEligible: boolean
   ): Promise<FileDetails> {
     const fileDetails = loadScenarioData(scenarioId);
     const localSample = path.resolve(process.cwd(), 'src', 'data', client, sampleFileName);
@@ -35,7 +37,7 @@ export class Orchestrator {
     fileDetails.fileInfo = client;
     fileDetails.scenarioId = scenarioId;
 
-    await fileSystem.createGbcNfXif(fileDetails);
+    await fileSystem.createNfFileByClient(fileDetails);
 
     if (!fileDetails.inputFileDescription) {
       throw new Error(
@@ -50,7 +52,7 @@ export class Orchestrator {
     await hangfirePage.goToHFJobs(db, fileDetails);
 
     const manualProcessingService = new ManualProcessingService();
-    const manualResponse = await manualProcessingService.processManualTransaction(fileDetails, 'YT', 'superuser');
+    const manualResponse = await manualProcessingService.processManualTransaction(fileDetails, province, 'superuser');
     console.log('Manual Processing API response:', manualResponse);
 
     const downloadPage = new DownloadPage(page);
@@ -62,22 +64,24 @@ export class Orchestrator {
     );
     console.log('Summary report file downloaded and verified:', fileDetails.summaryReportFileName);
 
-    if (!fileDetails.returnFileDescription) {
-      throw new Error(
-        `ReturnFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
-        `Please add it so DB can resolve the Return UniqueId.`
+    if (returnFileEligible) {
+      if (!fileDetails.returnFileDescription) {
+        throw new Error(
+          `ReturnFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+          `Please add it so DB can resolve the Return UniqueId.`
+        );
+      }
+      fileDetails.downloadFileType = 'ReturnFile';
+      await this.downloadAndValidateReturnFileWithRetry(
+        page,
+        db,
+        hangfirePage,
+        downloadPage,
+        fileDetails,
+        downloadDir,
+        testName
       );
     }
-    fileDetails.downloadFileType = 'ReturnFile';
-    await this.downloadAndValidateReturnFileWithRetry(
-      page,
-      db,
-      hangfirePage,
-      downloadPage,
-      fileDetails,
-      downloadDir,
-      testName
-    );
 
     console.log(
       `File processed with Batchnumber ${fileDetails.batchNumber}, ` +
@@ -355,9 +359,9 @@ const downloadPage = new DownloadPage(page);
 
     let lastError: unknown;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    
+     await triggerReturnGeneration();
       await downloadPage.setDownloadCriteria(fileDetails);
-      await downloadPage.downloadAndVerify(fileDetails, downloadDir, testName);
+      await downloadPage.downloadAndVerifyReturnFile(fileDetails, downloadDir, testName);
       try {
         await this.validatePartnerReferenceInReturnFile(fileDetails, testName);
         return;
@@ -366,7 +370,7 @@ const downloadPage = new DownloadPage(page);
         lastError = error;
         if (attempt < maxAttempts) {
           await page.waitForTimeout(15000);
-           await triggerReturnGeneration();
+          
         }
       }
     }

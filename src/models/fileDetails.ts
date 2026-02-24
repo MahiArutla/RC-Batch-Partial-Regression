@@ -28,4 +28,5 @@ export interface FileDetails {
   returnFileName?: string;
   baseRegistrationNum?: string;
   downloadFilePath?: string;
+  batchType?: string;
 }

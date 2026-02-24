@@ -1,5 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
+import { readFileSync, writeFileSync } from 'fs';
 import { loadEnv } from '../config/env';
 import { FileDetails } from '../models/fileDetails';
 import { generateA8DigitReference, generateBatchNumber, generateBmoInputFileName, generateFordReference } from './random';
@@ -158,6 +159,72 @@ export async function updateReferenceNumberInFordFile(filePath: string, referenc
   await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
 }
 
+function generateId(prefix: string): string {
+  const now = new Date();
+
+  const date =
+    now.getFullYear() +
+    "-" +
+    String(now.getMonth() + 1).padStart(2, "0") +
+    "-" +
+    String(now.getDate()).padStart(2, "0");
+
+  const time =
+    String(now.getHours()).padStart(2, "0") +
+    String(now.getMinutes()).padStart(2, "0") +
+    String(now.getSeconds()).padStart(2, "0") +
+    String(now.getMilliseconds()).padStart(3, "0");
+
+  return `${prefix}${date} ${time}`;
+}
+
+// Usage
+const value = generateId("LON-TDAF");
+console.log(value);
+
+export async function updateRenewalFile(filePath: string, fileDetails: FileDetails): Promise<void> {
+  const content = await fs.readFile(filePath, 'utf-8');
+  const lines = content.split(/\r?\n/);
+
+  if (lines.length > 0) {
+    // Update the first line by replacing the old date with the current date
+    const currentDate = new Date().toISOString().split('T')[0]; // yyyy-MM-dd
+    lines[0] = lines[0].replace(/\d{4}-\d{2}-\d{2}/, currentDate);
+
+    const now = new Date();
+    const timeString =
+      String(now.getHours()).padStart(2, '0') +
+      String(now.getMinutes()).padStart(2, '0') +
+      String(now.getSeconds()).padStart(2, '0') +
+      String(now.getMilliseconds()).padStart(3, '0');
+
+    // Replace characters from the 20th to 27th position (0-based: 19 to 26)
+    if (lines[0].length >= 27) {
+      lines[0] = lines[0].substring(0, 19) + timeString + lines[0].substring(27);
+    }
+
+    fileDetails.batchNumber = lines[0];
+    fileDetails.batchNumber = fileDetails.batchNumber.replace(/,/g, '');
+
+    // Check if there are at least 3 lines in the file
+    if (lines.length >= 3) {
+      // Split the third line into cells
+      const cells = lines[2].split(',');
+
+      // Replace the first cell with the new reference number
+      if (cells.length > 0) {
+        cells[0] = fileDetails.partnerReference || '';
+      }
+
+      // Reconstruct the third line
+      lines[2] = cells.join(',');
+    }
+  }
+
+  // Write the modified lines back to the file
+  await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper functions for timestamp and filename generation
 // ─────────────────────────────────────────────────────────────────────────────
@@ -209,6 +276,18 @@ function buildNfFileName(fileDetails: FileDetails): string {
       return `TDC50toPPSA.${formatTimestampWithMillis()}.XIF`;
     case 'FORD':
       return `FORD_NF_${formatTimestamp()}.FC`;
+    default:
+      return `DEFAULT_${formatTimestamp()}.XIF`;
+  }
+}
+function buildRenewalFileName(fileDetails: FileDetails): string {
+  switch (fileDetails.client.toUpperCase()) {
+     case 'TDAF':
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      return `TDAF_Renewal_${yyyy}${mm}${dd}.csv`;
     default:
       return `DEFAULT_${formatTimestamp()}.XIF`;
   }
@@ -417,5 +496,23 @@ export async function createNfFileByClient(fileDetails: FileDetails): Promise<vo
   }
   // default to XIF path
   return createNfFile(fileDetails);
+}
+
+export async function createRenewalFile(fileDetails: FileDetails): Promise<void> {
+  const scenarioArtifactsDir = path.join(process.cwd(), 'artifacts', fileDetails.scenarioId);
+  await ensureDirectory(scenarioArtifactsDir);
+
+  const inputFileName = buildRenewalFileName(fileDetails);
+  const sourceFilePath = path.join(scenarioArtifactsDir, inputFileName);
+  await copyFile(fileDetails.sampleFile, sourceFilePath);
+
+  await updateRenewalFile(sourceFilePath, fileDetails);
+
+  const targetPath = buildSftpTarget(fileDetails.fileInfo, inputFileName);
+  const targetDir = path.dirname(targetPath);
+  await ensureDirectory(targetDir);
+  await clearDirectory(targetDir);
+  await copyFile(sourceFilePath, targetPath);
+  fileDetails.inputFileName = inputFileName;
 }
 

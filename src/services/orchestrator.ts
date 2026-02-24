@@ -47,6 +47,7 @@ export class Orchestrator {
     }
 
     const db = new DbService();
+    fileDetails.batchType = 'NF';
     await db.setProcessAndFileStatusToNotStarted(fileDetails);
     const hangfirePage = new HangfireJobsPage(page);
     await hangfirePage.goToHFJobs(db, fileDetails);
@@ -93,8 +94,70 @@ export class Orchestrator {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // Ford Happy Path NF
+  // Renewal Happy Path
   // ─────────────────────────────────────────────────────────────────────────────
+  async runRenewalHappyPath(
+    page: Page,
+    scenarioId: string,
+    client: string,
+    sampleFileName: string,
+    testName: string,
+    province: string,
+    partnerReference: string
+  ): Promise<FileDetails> {
+    const fileDetails = loadScenarioData(scenarioId);
+    const localSample = path.resolve(process.cwd(), 'src', 'data', client, sampleFileName);
+    fileDetails.sampleFile = localSample;
+    fileDetails.client = client;
+    fileDetails.fileInfo = client;
+    fileDetails.scenarioId = scenarioId;
+    fileDetails.partnerReference = partnerReference;
+
+    // Update renewal file
+   
+
+    // Rename file based on updated batch number (assuming the first line is the new filename)
+    // Note: File is updated in place; renaming might be handled by the system or manually
+
+    // Upload to SFTP (assuming this is handled externally or by the file creation process)
+    await fileSystem.createRenewalFile(fileDetails);
+
+    if (!fileDetails.inputFileDescription) {
+      throw new Error(
+        `InputFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the NF UniqueId.`
+      );
+    }
+
+    const db = new DbService();
+    fileDetails.batchType = 'Renewal';
+    await db.setProcessAndFileStatusToNotStarted(fileDetails);
+    const hangfirePage = new HangfireJobsPage(page);
+    await hangfirePage.goToProcessHFJobs(db, fileDetails);
+    await db.validateHandshakeJobStatus(fileDetails);
+    console.log('Handshake job status validated in DB');
+
+    const manualProcessingService = new ManualProcessingService();
+    const manualResponse = await manualProcessingService.processManualTransaction(fileDetails, province, 'superuser');
+    console.log('Manual Processing API response:', manualResponse);
+
+    const downloadPage = new DownloadPage(page);
+    await downloadPage.setDownloadCriteria(fileDetails);
+    const downloadDir = process.env.PW_DOWNLOADS_DIR || path.resolve(process.cwd(), 'downloads');
+    await downloadPage.downloadAndVerify(fileDetails, downloadDir, testName);
+    ExcelHelper.verifyImportedSuccessfullyGreaterThanZero(
+      path.join(process.cwd(), 'artifacts', testName, fileDetails.summaryReportFileName!)
+    );
+    console.log('Summary report file downloaded and verified:', fileDetails.summaryReportFileName);
+
+    console.log(
+      `Renewal file processed with Batchnumber ${fileDetails.batchNumber}, ` +
+      `filename ${fileDetails.inputFileName}  PartnerReference ${fileDetails.partnerReference} ` +
+      `and OrderId ${fileDetails.orderId}`
+    );
+
+    return fileDetails;
+  }
   async runFordHappyPathNF(page: Page, scenarioId: string): Promise<FileDetails> {
     const fileDetails = loadScenarioData(scenarioId);
     fileDetails.client = fileDetails.client || 'FORD';
@@ -112,6 +175,7 @@ export class Orchestrator {
     await fileSystem.createFordNfFc(fileDetails);
 
     const db = new DbService();
+    fileDetails.batchType = 'NF';
     await db.setProcessAndFileStatusToNotStarted(fileDetails);
     const hangfirePage = new HangfireJobsPage(page);
     await hangfirePage.goToProcessHFJobs(db, fileDetails);
@@ -143,6 +207,7 @@ export class Orchestrator {
     await fileSystem.createBnsCommNfXml(fileDetails);
 
     const db = new DbService();
+    fileDetails.batchType = 'NF';
     await db.setProcessAndFileStatusToNotStarted(fileDetails);
     const hangfirePage = new HangfireJobsPage(page);
     await hangfirePage.goToHFJobs(db, fileDetails);
@@ -196,6 +261,7 @@ export class Orchestrator {
     await fileSystem.createBnsCommDischargeXml(fileDetails);
     
     const db = new DbService();
+    fileDetails.batchType = 'NF';
     await db.setProcessAndFileStatusToNotStarted(fileDetails);
     const hangfirePage = new HangfireJobsPage(page);
     await hangfirePage.goToProcessHFJobs(db, fileDetails);
@@ -249,6 +315,7 @@ const downloadPage = new DownloadPage(page);
     await fileSystem.createBnsCommDischargeXml(fileDetails);
     
     const db = new DbService();
+    fileDetails.batchType = 'NF';
     await db.setProcessAndFileStatusToNotStarted(fileDetails);
     const hangfirePage = new HangfireJobsPage(page);
     await hangfirePage.goToProcessHFJobs(db, fileDetails);
@@ -302,6 +369,7 @@ const downloadPage = new DownloadPage(page);
     await fileSystem.createBnsCommDischargeXml(fileDetails);
     
     const db = new DbService();
+    fileDetails.batchType = 'NF';
     await db.setProcessAndFileStatusToNotStarted(fileDetails);
     const hangfirePage = new HangfireJobsPage(page);
     await hangfirePage.goToHFJobs(db, fileDetails);
@@ -351,6 +419,7 @@ const downloadPage = new DownloadPage(page);
     maxAttempts: number = 6
   ): Promise<void> {
     const triggerReturnGeneration = async (): Promise<void> => {
+      fileDetails.batchType = 'Return';
       await db.setProcessAndFileStatusToNotStartedReturn(fileDetails);
       await hangfirePage.waitForHangfireReady();
       await hangfirePage.disableStickyHeader();
@@ -412,6 +481,7 @@ const downloadPage = new DownloadPage(page);
   async createNfFileTilde(fileDetails: FileDetails): Promise<void> {
     await fileSystem.createNfFileTilde(fileDetails);
     const db = new DbService();
+    fileDetails.batchType = 'NF';
     await db.setProcessAndFileStatusToNotStarted(fileDetails);
   }
 
@@ -424,6 +494,7 @@ const downloadPage = new DownloadPage(page);
   async prepareReturnFile(fileDetails: FileDetails): Promise<void> {
     fileDetails.downloadFileType = 'ReturnFile';
     const db = new DbService();
+    fileDetails.batchType = 'Return';
     await db.setProcessAndFileStatusToNotStartedReturn(fileDetails);
   }
 

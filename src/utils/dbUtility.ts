@@ -4,7 +4,7 @@ import { FileDetails } from '../models/fileDetails';
 
 const env = loadEnv();
 
-type BatchType = 'NF' | 'Return';
+type BatchType = string;
 
 interface ProcessStatusFileStatusResponse {
   processStatusId: number;
@@ -59,20 +59,40 @@ export class DbService {
 
   async getUniqueBatchFileId(fileDetails: FileDetails, type: BatchType): Promise<string> {
     const pool = await this.getPool();
-    const description =
-      type === 'Return' ? fileDetails.returnFileDescription : fileDetails.inputFileDescription;
+    let query: string;
+    let description: string | null | undefined;
+
+    if (type === 'Return') {
+      description = fileDetails.returnFileDescription;
+      query =
+        'SELECT TOP 1 UniqueId FROM ClientFileScheduleInfo ' +
+        'WHERE ClientFileInfoId IN (' +
+        'SELECT Id FROM ClientFileInfo WHERE ClientInfoId = (SELECT Id FROM ClientInfo WHERE CorporationCode = @client) ' +
+        'AND Description = @description) AND IsEnabled = 1';
+    } else if (type === 'Renewal') {
+      description = fileDetails.renewalFileDescription;
+      query =
+        'SELECT TOP 1 UniqueId FROM ClientFileScheduleInfo ' +
+        'WHERE ClientFileInfoId IN (' +
+        'SELECT Id FROM ClientFileInfo WHERE ClientInfoId = (SELECT Id FROM ClientInfo WHERE CorporationCode = @client) ' +
+        'AND Description LIKE @description) AND IsEnabled = 1';
+    } else {
+      description = fileDetails.inputFileDescription;
+      query =
+        'SELECT TOP 1 UniqueId FROM ClientFileScheduleInfo ' +
+        'WHERE ClientFileInfoId IN (' +
+        'SELECT Id FROM ClientFileInfo WHERE ClientInfoId = (SELECT Id FROM ClientInfo WHERE CorporationCode = @client) ' +
+        'AND Description = @description) AND IsEnabled = 1';
+    }
+
     if (!description) {
       throw new Error(`Missing description for ${type} file.`);
     }
-    const query =
-      'SELECT TOP 1 UniqueId FROM ClientFileScheduleInfo ' +
-      'WHERE ClientFileInfoId IN (' +
-      'SELECT Id FROM ClientFileInfo WHERE ClientInfoId = (SELECT Id FROM ClientInfo WHERE CorporationCode = @client) ' +
-      'AND Description = @description) AND IsEnabled = 1';
+
     const result = await pool
       .request()
       .input('client', sql.VarChar(50), fileDetails.client)
-      .input('description', sql.VarChar(200), description)
+      .input('description', sql.VarChar(200), description as string)
       .query(query);
     const uniqueId: string | undefined = result.recordset[0]?.UniqueId;
     if (!uniqueId) {
@@ -171,13 +191,15 @@ export class DbService {
   }
 
   async setProcessAndFileStatusToNotStartedReturn(fileDetails: FileDetails): Promise<void> {
-    fileDetails.uniqueId = await this.getUniqueBatchFileId(fileDetails, 'Return');
+    const type = fileDetails.batchType || 'Return';
+    fileDetails.uniqueId = await this.getUniqueBatchFileId(fileDetails, type);
     await this.enableClient(fileDetails.client);
     await this.updateProcessAndFileStatusToNotStarted(fileDetails.uniqueId);
   }
 
   async setProcessAndFileStatusToNotStarted(fileDetails: FileDetails): Promise<void> {
-    fileDetails.uniqueId = await this.getUniqueBatchFileId(fileDetails, 'NF');
+    const type = fileDetails.batchType || 'NF';
+    fileDetails.uniqueId = await this.getUniqueBatchFileId(fileDetails, type);
     await this.enableClient(fileDetails.client);
     await this.updateProcessAndFileStatusToNotStarted(fileDetails.uniqueId);
   }

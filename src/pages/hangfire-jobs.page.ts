@@ -79,15 +79,12 @@ export class HangfireJobsPage {
   async goToProcessHFJobs(db: any, fileDetails: any): Promise<void> {
     await this.hangfireDashboard.click();
     await this.hfJobs.click();
-    // Switch to frame is handled by frameLocator
     await this.hfDashboardTab.click();
     await this.hfDbRecurringJobsTab.click();
     await this.triggerHFJobWithEnqueue('ClientFileScheduler');
     console.log('Triggered ClientFileScheduler Hangfire job');
-     
     await db.validateClientFileSchedulerJobFileStatusInDB(fileDetails);
     console.log('File got picked up from SFTP & File status and process status validated in DB for ClientFileScheduler job ');
-   
     await this.triggerHFJob('File Parsing');
     console.log('Triggered File Parsing Hangfire job');
     await this.triggerHFJob('LVS');
@@ -99,11 +96,9 @@ export class HangfireJobsPage {
    await this.triggerHFJob('Handshake');
     console.log('Triggered Handshake Hangfire job');
      }
-async goToHFJobsForReturnFile(db: any, fileDetails: any): Promise<void> {
-  
+  async goToHFJobsForReturnFile(db: any, fileDetails: any): Promise<void> {
     await this.hangfireDashboard.click();
     await this.hfJobs.click();
-    // Switch to frame is handled by frameLocator
     await this.hfDashboardTab.click();
     await this.hfDbRecurringJobsTab.click();
     await this.triggerHFJobWithEnqueue('FileClientProcessReadyApi');
@@ -119,16 +114,16 @@ async goToHFJobsForReturnFile(db: any, fileDetails: any): Promise<void> {
       }
       const jobElement = this.hangfireFrame.locator(`//div[@class='js-jobs-list']/div[2]/table/tbody/tr/td/input[@value='${job}']`);
       await expect(jobElement).toBeEnabled();
-      await jobElement.click(); 
+      await jobElement.click();
       const TriggerNowBttn = this.hangfireFrame.locator(`//button[normalize-space()='Trigger now']`);
-       await expect(TriggerNowBttn).toBeEnabled();
-      await TriggerNowBttn.click(); 
-     await this.page.waitForTimeout(1000);
-        } catch (error) {
+      await expect(TriggerNowBttn).toBeEnabled();
+      await TriggerNowBttn.click();
+      await this.page.waitForTimeout(1000);
+    } catch (error) {
       console.log(error);
     }
   }
- async triggerHFJobWithEnqueue(job: string): Promise<void> {
+  async triggerHFJobWithEnqueue(job: string): Promise<void> {
     try {
       const tableText = await this.recurringJobTable.textContent();
       if (!tableText?.includes(job)) {
@@ -138,14 +133,13 @@ async goToHFJobsForReturnFile(db: any, fileDetails: any): Promise<void> {
       await jobElement.click();
       await this.checkScheduledProcessingHFJobCount();
       await this.hangfireFrame.locator("//a[contains(text(),'Recurring Jobs')]").click();
-       } catch (error) {
+    } catch (error) {
       console.log(error);
     }
   }
   async checkScheduledProcessingHFJobCount(): Promise<void> {
-   // await this.triggerNow.scrollIntoViewIfNeeded();
     await this.triggerNow.click();
-     await this.page.waitForTimeout(1000);
+    await this.page.waitForTimeout(1000);
     await this.hangFireJobs.click();
     await this.page.waitForTimeout(1000);
     for (let i = 0; i < 3; i++) {
@@ -153,38 +147,36 @@ async goToHFJobsForReturnFile(db: any, fileDetails: any): Promise<void> {
       await this.processingJobsCount();
     }
   }
-async waitForHangfireReady(): Promise<void> {
-  // Ensure we are on the Hangfire view before waiting for the iframe
-  try { await this.hangfireDashboard.click({ timeout: 5000 }); } catch {}
-  try { await this.hfJobs.click({ timeout: 5000 }); } catch {}
+  async waitForHangfireReady(): Promise<void> {
+    try { await this.hangfireDashboard.click({ timeout: 5000 }); } catch {}
+    try { await this.hfJobs.click({ timeout: 5000 }); } catch {}
 
-  const iframe = this.page.locator(HANGFIRE_IFRAME);
-  await iframe.waitFor({ state: 'attached', timeout: 30000 });
+    const iframe = this.page.locator(HANGFIRE_IFRAME);
+    await iframe.waitFor({ state: 'attached', timeout: 30000 });
 
-  await this.hangfireFrame
-    .getByRole('link', { name: /Hangfire Dashboard/i })
-    .waitFor({ state: 'visible', timeout: 20000 });
-}
-async disableStickyHeader(): Promise<void> {
-  await this.page.addStyleTag({
-    content: `
-      app-header, mat-toolbar {
-        display: none !important;
-      }
-    `
-  });
-}
+    await this.hangfireFrame
+      .getByRole('link', { name: /Hangfire Dashboard/i })
+      .waitFor({ state: 'visible', timeout: 20000 });
+  }
+  async disableStickyHeader(): Promise<void> {
+    await this.page.addStyleTag({
+      content: `
+        app-header, mat-toolbar {
+          display: none !important;
+        }
+      `
+    });
+  }
 
   async scheduledJobsCountMethod(): Promise<void> {
     try {
-       await expect(this.scheduledJobs).toBeEnabled();
-      
+      await expect(this.scheduledJobs).toBeEnabled();
       await this.scheduledJobs.click();
       const schCountText = await this.scheduledJobsCount.textContent();
       const schCountVal = parseInt(schCountText || '0', 10);
       if (schCountVal > 0) {
-         await expect(this.enqueuedJobsSelectAllCheckbox).toBeEnabled();
-     await this.page.waitForTimeout(2000);
+        await expect(this.enqueuedJobsSelectAllCheckbox).toBeEnabled();
+        await this.page.waitForTimeout(2000);
         await this.enqueuedJobsSelectAllCheckbox.click();
         await this.enqueuedJobsTriggerButton.click();
         await this.page.waitForTimeout(2000);
@@ -199,7 +191,6 @@ async disableStickyHeader(): Promise<void> {
     let countText = await this.processingJobCount.textContent();
     let countNum = parseInt(countText || '0', 10);
     while (countNum > 0) {
-      //await this.page.waitForTimeout(2000);
       countText = await this.processingJobCount.textContent();
       countNum = parseInt(countText || '0', 10);
     }

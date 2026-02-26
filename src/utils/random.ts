@@ -37,3 +37,7 @@ export function generateFordReference(): string {
   const fiveDigits = randomInt(10_000, 99_999).toString();
   return `2AASM${fiveDigits}`;
 }
+
+export function generateTdafReference(): string {
+  return `S${randomInt(10_000_000, 99_999_999)}`;
+}

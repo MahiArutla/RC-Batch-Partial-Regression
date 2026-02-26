@@ -76,6 +76,20 @@ export class DbService {
         'WHERE ClientFileInfoId IN (' +
         'SELECT Id FROM ClientFileInfo WHERE ClientInfoId = (SELECT Id FROM ClientInfo WHERE CorporationCode = @client) ' +
         'AND Description LIKE @description) AND IsEnabled = 1';
+    } else if (type === 'Discharge') {
+      description = fileDetails.dischargeFileDescription;
+      query =
+        'SELECT TOP 1 UniqueId FROM ClientFileScheduleInfo ' +
+        'WHERE ClientFileInfoId IN (' +
+        'SELECT Id FROM ClientFileInfo WHERE ClientInfoId = (SELECT Id FROM ClientInfo WHERE CorporationCode = @client) ' +
+        'AND Description LIKE @description) AND IsEnabled = 1';
+    }  else if (type === 'COP') {
+      description = fileDetails.copFileDescription;
+      query =
+        'SELECT TOP 1 UniqueId FROM ClientFileScheduleInfo ' +
+        'WHERE ClientFileInfoId IN (' +
+        'SELECT Id FROM ClientFileInfo WHERE ClientInfoId = (SELECT Id FROM ClientInfo WHERE CorporationCode = @client) ' +
+        'AND Description LIKE @description) AND IsEnabled = 1';
     } else {
       description = fileDetails.inputFileDescription;
       query =

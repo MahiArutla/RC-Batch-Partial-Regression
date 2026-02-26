@@ -13,10 +13,6 @@ export class LoginPage extends BasePage {
     this.signInButton = page.getByRole('button', { name: /sign in/i });
   }
 
-  async goto(url: string): Promise<void> {
-    await super.goto(url);
-  }
-
   async login(user: string, password: string): Promise<void> {
     await this.fill(this.emailInput, user);
     await this.fill(this.passwordInput, password);

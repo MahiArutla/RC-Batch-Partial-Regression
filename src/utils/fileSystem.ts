@@ -3,7 +3,7 @@ import path from 'path';
 import { readFileSync, writeFileSync } from 'fs';
 import { loadEnv } from '../config/env';
 import { FileDetails } from '../models/fileDetails';
-import { generateA8DigitReference, generateBatchNumber, generateBmoInputFileName, generateFordReference } from './random';
+import { generateA8DigitReference, generateBatchNumber, generateBmoInputFileName, generateFordReference, generateTdafReference } from './random';
 
 const env = loadEnv();
 
@@ -225,6 +225,74 @@ export async function updateRenewalFile(filePath: string, fileDetails: FileDetai
   await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
 }
 
+export async function updateDischargeFile(filePath: string, fileDetails: FileDetails): Promise<void> {
+  const content = await fs.readFile(filePath, 'utf-8');
+  const lines = content.split(/\r?\n/);
+
+  if (lines.length > 0) {
+    // Update the first line with current date and time
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const MM = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const HH = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    const ff = String(Math.floor(now.getMilliseconds() / 10)).padStart(2, '0');
+    const dateTimeString = `${yyyy}-${MM}-${dd} ${HH}${mm}${ss}${ff}`;
+
+    // Replace the date-time portion in the first line
+    lines[0] = lines[0].replace(/\d{4}-\d{2}-\d{2}\s+\d{8}/, dateTimeString);
+
+    // Extract batch number from position 4 onwards (skip first 4 zeros)
+    // e.g., "0000LON-TDAF2026-02-26 02413499" -> "LON-TDAF2026-02-26 02413499"
+    fileDetails.batchNumber = lines[0].substring(4);
+    fileDetails.batchNumber = fileDetails.batchNumber.replace(/,/g, '');
+  }
+
+  // Update the second line with partner reference
+  if (lines.length >= 2 && fileDetails.partnerReference) {
+    lines[1] = lines[1].replace(/PARTNRREF/g, fileDetails.partnerReference);
+  }
+
+  // Write the modified lines back to the file
+  await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
+}
+
+export async function updateChangeOfProvinceFile(filePath: string, fileDetails: FileDetails): Promise<void> {
+  const content = await fs.readFile(filePath, 'utf-8');
+  const lines = content.split(/\r?\n/);
+
+  if (lines.length > 0) {
+    // Update the first line with current date and time
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const MM = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const HH = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    const ff = String(Math.floor(now.getMilliseconds() / 10)).padStart(2, '0');
+    const dateTimeString = `${yyyy}-${MM}-${dd} ${HH}${mm}${ss}${ff}`;
+
+    // Replace the date-time portion in the first line
+    lines[0] = lines[0].replace(/\d{4}-\d{2}-\d{2}\s+\d{8}/, dateTimeString);
+
+    // Extract batch number from position 4 onwards (skip first 4 zeros)
+    // e.g., "0000LON-TDAF2026-02-26 02413499" -> "LON-TDAF2026-02-26 02413499"
+    fileDetails.batchNumber = lines[0].substring(4);
+    fileDetails.batchNumber = fileDetails.batchNumber.replace(/,/g, '');
+  }
+
+  // Update the second line with partner reference
+  if (lines.length >= 2 && fileDetails.partnerReference) {
+    lines[1] = lines[1].replace(/PARTNRREF/g, fileDetails.partnerReference);
+  }
+
+  // Write the modified lines back to the file
+  await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper functions for timestamp and filename generation
 // ─────────────────────────────────────────────────────────────────────────────
@@ -290,6 +358,32 @@ function buildRenewalFileName(fileDetails: FileDetails): string {
       return `TDAF_Renewal_${yyyy}${mm}${dd}.csv`;
     default:
       return `DEFAULT_${formatTimestamp()}.XIF`;
+  }
+}
+
+function buildDischargeFileName(fileDetails: FileDetails): string {
+  switch (fileDetails.client.toUpperCase()) {
+    case 'TDAF':
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      return `TDAF_Discharge_${yyyy}${mm}${dd}.txt`;
+    default:
+      return `DEFAULT_${formatTimestamp()}.txt`;
+  }
+}
+
+function buildChangeOfProvinceFileName(fileDetails: FileDetails): string {
+  switch (fileDetails.client.toUpperCase()) {
+    case 'TDAF':
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      return `TDAF_ChangeOfProvince_${yyyy}${mm}${dd}.txt`;
+    default:
+      return `DEFAULT_${formatTimestamp()}.txt`;
   }
 }
 
@@ -370,7 +464,14 @@ export async function createNfFileTilde(fileDetails: FileDetails): Promise<void>
 
 export async function createNfFile(fileDetails: FileDetails): Promise<void> {
   fileDetails.batchNumber = generateBatchNumber();
-  fileDetails.partnerReference = generateA8DigitReference();
+
+  // Use TDAF-specific format for TDAF client
+  if (fileDetails.client?.toUpperCase() === 'TDAF') {
+    fileDetails.partnerReference = generateTdafReference();
+  } else {
+    fileDetails.partnerReference = generateA8DigitReference();
+  }
+
   await updateNfFile(fileDetails);
 }
 
@@ -507,6 +608,42 @@ export async function createRenewalFile(fileDetails: FileDetails): Promise<void>
   await copyFile(fileDetails.sampleFile, sourceFilePath);
 
   await updateRenewalFile(sourceFilePath, fileDetails);
+
+  const targetPath = buildSftpTarget(fileDetails.fileInfo, inputFileName);
+  const targetDir = path.dirname(targetPath);
+  await ensureDirectory(targetDir);
+  await clearDirectory(targetDir);
+  await copyFile(sourceFilePath, targetPath);
+  fileDetails.inputFileName = inputFileName;
+}
+
+export async function createDischargeFile(fileDetails: FileDetails): Promise<void> {
+  const scenarioArtifactsDir = path.join(process.cwd(), 'artifacts', fileDetails.scenarioId);
+  await ensureDirectory(scenarioArtifactsDir);
+
+  const inputFileName = buildDischargeFileName(fileDetails);
+  const sourceFilePath = path.join(scenarioArtifactsDir, inputFileName);
+  await copyFile(fileDetails.sampleFile, sourceFilePath);
+
+  await updateDischargeFile(sourceFilePath, fileDetails);
+
+  const targetPath = buildSftpTarget(fileDetails.fileInfo, inputFileName);
+  const targetDir = path.dirname(targetPath);
+  await ensureDirectory(targetDir);
+  await clearDirectory(targetDir);
+  await copyFile(sourceFilePath, targetPath);
+  fileDetails.inputFileName = inputFileName;
+}
+
+export async function createChangeOfProvinceFile(fileDetails: FileDetails): Promise<void> {
+  const scenarioArtifactsDir = path.join(process.cwd(), 'artifacts', fileDetails.scenarioId);
+  await ensureDirectory(scenarioArtifactsDir);
+
+  const inputFileName = buildChangeOfProvinceFileName(fileDetails);
+  const sourceFilePath = path.join(scenarioArtifactsDir, inputFileName);
+  await copyFile(fileDetails.sampleFile, sourceFilePath);
+
+  await updateChangeOfProvinceFile(sourceFilePath, fileDetails);
 
   const targetPath = buildSftpTarget(fileDetails.fileInfo, inputFileName);
   const targetDir = path.dirname(targetPath);

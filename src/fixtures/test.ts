@@ -1,5 +1,4 @@
 import { test as base, Page } from '@playwright/test';
-import { loadEnv } from '../config/env';
 import { LoginPage } from '../pages/login.page';
 import { HomePage } from '../pages/home.page';
 import { DownloadPage } from '../pages/download.page';
@@ -15,7 +14,6 @@ type Pages = {
 
 export const test = base.extend<Pages>({
   page: async ({ page }, use) => {
-    const env = loadEnv();
     // BaseURL is set in config; ensure we have a logged-in storageState
     await use(page);
   },

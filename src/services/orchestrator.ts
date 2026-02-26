@@ -12,12 +12,6 @@ import { loadScenarioData } from '../data/testData';
 import { ManualProcessingService } from './manualProcessingService';
 
 export class Orchestrator {
-  static runBnsCommHappyPathNF(page: any, scenarioId: string): any {
-    throw new Error('Method not implemented.');
-  }
-  static runBnsCommHappyPathAmendment(page: any, amendmentScenarioId: string, registrationNumber: any, arg3: any): any {
-    throw new Error('Method not implemented.');
-  }
   // ─────────────────────────────────────────────────────────────────────────────
   // GBC Happy Path NF
   // ─────────────────────────────────────────────────────────────────────────────
@@ -113,13 +107,6 @@ export class Orchestrator {
     fileDetails.scenarioId = scenarioId;
     fileDetails.partnerReference = partnerReference;
 
-    // Update renewal file
-   
-
-    // Rename file based on updated batch number (assuming the first line is the new filename)
-    // Note: File is updated in place; renaming might be handled by the system or manually
-
-    // Upload to SFTP (assuming this is handled externally or by the file creation process)
     await fileSystem.createRenewalFile(fileDetails);
 
     if (!fileDetails.inputFileDescription) {
@@ -158,6 +145,125 @@ export class Orchestrator {
 
     return fileDetails;
   }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Discharge Happy Path
+  // ─────────────────────────────────────────────────────────────────────────────
+  async runDischargeHappyPath(
+    page: Page,
+    scenarioId: string,
+    client: string,
+    sampleFileName: string,
+    testName: string,
+    province: string,
+    partnerReference: string
+  ): Promise<FileDetails> {
+    const fileDetails = loadScenarioData(scenarioId);
+    const localSample = path.resolve(process.cwd(), 'src', 'data', client, sampleFileName);
+    fileDetails.sampleFile = localSample;
+    fileDetails.client = client;
+    fileDetails.fileInfo = client;
+    fileDetails.scenarioId = scenarioId;
+    fileDetails.partnerReference = partnerReference;
+
+    await fileSystem.createDischargeFile(fileDetails);
+
+    if (!fileDetails.inputFileDescription) {
+      throw new Error(
+        `InputFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the NF UniqueId.`
+      );
+    }
+
+    const db = new DbService();
+    fileDetails.batchType = 'Discharge';
+    await db.setProcessAndFileStatusToNotStarted(fileDetails);
+    const hangfirePage = new HangfireJobsPage(page);
+    await hangfirePage.goToProcessHFJobs(db, fileDetails);
+    await db.validateHandshakeJobStatus(fileDetails);
+    console.log('Handshake job status validated in DB');
+
+    const manualProcessingService = new ManualProcessingService();
+    const manualResponse = await manualProcessingService.processManualTransaction(fileDetails, province, 'superuser');
+    console.log('Manual Processing API response:', manualResponse);
+
+    const downloadPage = new DownloadPage(page);
+    await downloadPage.setDownloadCriteria(fileDetails);
+    const downloadDir = process.env.PW_DOWNLOADS_DIR || path.resolve(process.cwd(), 'downloads');
+    await downloadPage.downloadAndVerify(fileDetails, downloadDir, testName);
+    ExcelHelper.verifyImportedSuccessfullyGreaterThanZero(
+      path.join(process.cwd(), 'artifacts', testName, fileDetails.summaryReportFileName!)
+    );
+    console.log('Summary report file downloaded and verified:', fileDetails.summaryReportFileName);
+
+    console.log(
+      `Discharge file processed with Batchnumber ${fileDetails.batchNumber}, ` +
+      `filename ${fileDetails.inputFileName}  PartnerReference ${fileDetails.partnerReference} ` +
+      `and OrderId ${fileDetails.orderId}`
+    );
+
+    return fileDetails;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Change of Province Happy Path
+  // ─────────────────────────────────────────────────────────────────────────────
+  async runChangeOfProvinceHappyPath(
+    page: Page,
+    scenarioId: string,
+    client: string,
+    sampleFileName: string,
+    testName: string,
+    province: string,
+    partnerReference: string
+  ): Promise<FileDetails> {
+    const fileDetails = loadScenarioData(scenarioId);
+    const localSample = path.resolve(process.cwd(), 'src', 'data', client, sampleFileName);
+    fileDetails.sampleFile = localSample;
+    fileDetails.client = client;
+    fileDetails.fileInfo = client;
+    fileDetails.scenarioId = scenarioId;
+    fileDetails.partnerReference = partnerReference;
+
+    await fileSystem.createChangeOfProvinceFile(fileDetails);
+
+    if (!fileDetails.inputFileDescription) {
+      throw new Error(
+        `InputFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the NF UniqueId.`
+      );
+    }
+
+    const db = new DbService();
+    fileDetails.batchType = 'COP';
+    await db.setProcessAndFileStatusToNotStarted(fileDetails);
+    const hangfirePage = new HangfireJobsPage(page);
+    await hangfirePage.goToProcessHFJobs(db, fileDetails);
+    await db.validateHandshakeJobStatus(fileDetails);
+    console.log('Handshake job status validated in DB');
+
+    const manualProcessingService = new ManualProcessingService();
+    const manualResponse = await manualProcessingService.processManualTransaction(fileDetails, province, 'superuser');
+    console.log('Manual Processing API response:', manualResponse);
+
+    const downloadPage = new DownloadPage(page);
+    await downloadPage.setDownloadCriteria(fileDetails);
+    const downloadDir = process.env.PW_DOWNLOADS_DIR || path.resolve(process.cwd(), 'downloads');
+    await downloadPage.downloadAndVerify(fileDetails, downloadDir, testName);
+    ExcelHelper.verifyImportedSuccessfullyGreaterThanZero(
+      path.join(process.cwd(), 'artifacts', testName, fileDetails.summaryReportFileName!)
+    );
+    console.log('Summary report file downloaded and verified:', fileDetails.summaryReportFileName);
+
+    console.log(
+      `Change of Province file processed with Batchnumber ${fileDetails.batchNumber}, ` +
+      `filename ${fileDetails.inputFileName}  PartnerReference ${fileDetails.partnerReference} ` +
+      `and OrderId ${fileDetails.orderId}`
+    );
+
+    return fileDetails;
+  }
+
   async runFordHappyPathNF(page: Page, scenarioId: string): Promise<FileDetails> {
     const fileDetails = loadScenarioData(scenarioId);
     fileDetails.client = fileDetails.client || 'FORD';
@@ -256,10 +362,9 @@ export class Orchestrator {
     fileDetails.scenarioId = scenarioId;
     fileDetails.partnerReference = partnerReference;
     fileDetails.baseRegistrationNum = registrationNumber;
-  
-    // Create discharge file using fileSystem
+
     await fileSystem.createBnsCommDischargeXml(fileDetails);
-    
+
     const db = new DbService();
     fileDetails.batchType = 'NF';
     await db.setProcessAndFileStatusToNotStarted(fileDetails);
@@ -270,7 +375,8 @@ export class Orchestrator {
     const manualProcessingService = new ManualProcessingService();
     const manualResponse = await manualProcessingService.processManualTransaction(fileDetails, 'BC', 'superuser');
     console.log('Manual Processing API response:', manualResponse);
-const downloadPage = new DownloadPage(page);
+
+    const downloadPage = new DownloadPage(page);
     const downloadDir = process.env.PW_DOWNLOADS_DIR || path.resolve(process.cwd(), 'downloads');
     const testName = scenarioId;
 
@@ -310,10 +416,9 @@ const downloadPage = new DownloadPage(page);
     fileDetails.scenarioId = scenarioId;
     fileDetails.partnerReference = partnerReference;
     fileDetails.baseRegistrationNum = registrationNumber;
-  
-    // Create Renewal file using fileSystem
+
     await fileSystem.createBnsCommDischargeXml(fileDetails);
-    
+
     const db = new DbService();
     fileDetails.batchType = 'NF';
     await db.setProcessAndFileStatusToNotStarted(fileDetails);
@@ -324,7 +429,8 @@ const downloadPage = new DownloadPage(page);
     const manualProcessingService = new ManualProcessingService();
     const manualResponse = await manualProcessingService.processManualTransaction(fileDetails, 'BC', 'superuser');
     console.log('Manual Processing API response:', manualResponse);
-const downloadPage = new DownloadPage(page);
+
+    const downloadPage = new DownloadPage(page);
     const downloadDir = process.env.PW_DOWNLOADS_DIR || path.resolve(process.cwd(), 'downloads');
     const testName = scenarioId;
 
@@ -364,10 +470,9 @@ const downloadPage = new DownloadPage(page);
     fileDetails.scenarioId = scenarioId;
     fileDetails.partnerReference = partnerReference;
     fileDetails.baseRegistrationNum = registrationNumber;
-  
-    // Create Amendment file using fileSystem
+
     await fileSystem.createBnsCommDischargeXml(fileDetails);
-    
+
     const db = new DbService();
     fileDetails.batchType = 'NF';
     await db.setProcessAndFileStatusToNotStarted(fileDetails);
@@ -376,7 +481,8 @@ const downloadPage = new DownloadPage(page);
     const manualProcessingService = new ManualProcessingService();
     const manualResponse = await manualProcessingService.processManualTransaction(fileDetails, 'BC', 'superuser');
     console.log('Manual Processing API response:', manualResponse);
-const downloadPage = new DownloadPage(page);
+
+    const downloadPage = new DownloadPage(page);
     const downloadDir = process.env.PW_DOWNLOADS_DIR || path.resolve(process.cwd(), 'downloads');
     const testName = scenarioId;
 
@@ -428,18 +534,16 @@ const downloadPage = new DownloadPage(page);
 
     let lastError: unknown;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-     await triggerReturnGeneration();
+      await triggerReturnGeneration();
       await downloadPage.setDownloadCriteria(fileDetails);
       await downloadPage.downloadAndVerifyReturnFile(fileDetails, downloadDir, testName);
       try {
         await this.validatePartnerReferenceInReturnFile(fileDetails, testName);
         return;
       } catch (error) {
-         
         lastError = error;
         if (attempt < maxAttempts) {
           await page.waitForTimeout(15000);
-          
         }
       }
     }

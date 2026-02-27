@@ -3,7 +3,7 @@ import path from 'path';
 import { readFileSync, writeFileSync } from 'fs';
 import { loadEnv } from '../config/env';
 import { FileDetails } from '../models/fileDetails';
-import { generateA8DigitReference, generateBatchNumber, generateBmoInputFileName, generateFordReference, generateTdafReference } from './random';
+import { generateA8DigitReference, generateBatchNumber, generateBmoInputFileName, generateFordReference, generateTdafReference, generateVwReference, generateVin } from './random';
 
 const env = loadEnv();
 
@@ -92,6 +92,23 @@ export async function updatePartnerReferenceInXifFile(filePath: string, partnerR
 
   // Fallback: non-hyphenated tag <PartnerReference>...</PartnerReference>
   updated = content.replace(/(<\s*PartnerReference\s*>)[^<]*(<\s*\/\s*PartnerReference\s*>)/i, `$1${partnerReference}$2`);
+  if (updated !== content) {
+    await fs.writeFile(filePath, updated, 'utf-8');
+  }
+}
+
+export async function updateSerialNumberInXifFile(filePath: string, serialNumber: string): Promise<void> {
+  let content = await fs.readFile(filePath, 'utf-8');
+
+  // Update <Serial-Number>...</Serial-Number> tag
+  let updated = content.replace(/(<\s*Serial-Number\s*>)[^<]*(<\s*\/\s*Serial-Number\s*>)/i, `$1${serialNumber}$2`);
+  if (updated !== content) {
+    await fs.writeFile(filePath, updated, 'utf-8');
+    return;
+  }
+
+  // Fallback: non-hyphenated tag <SerialNumber>...</SerialNumber>
+  updated = content.replace(/(<\s*SerialNumber\s*>)[^<]*(<\s*\/\s*SerialNumber\s*>)/i, `$1${serialNumber}$2`);
   if (updated !== content) {
     await fs.writeFile(filePath, updated, 'utf-8');
   }
@@ -344,6 +361,9 @@ function buildNfFileName(fileDetails: FileDetails): string {
       return `TDC50toPPSA.${formatTimestampWithMillis()}.XIF`;
     case 'FORD':
       return `FORD_NF_${formatTimestamp()}.FC`;
+    case 'VW':
+    case 'VOLKSWAGEN':
+      return 'VCItoDH.XIF';
     default:
       return `DEFAULT_${formatTimestamp()}.XIF`;
   }
@@ -393,8 +413,11 @@ function buildSftpTarget(fileInfo: string, fileName: string): string {
       return path.join(env.sftpRoot, 'GBC', 'in', fileName);
     case 'BMO':
       return path.join(env.sftpRoot, 'BMO', 'in', fileName);
-       case 'TDAF':
+    case 'TDAF':
       return path.join(env.sftpRoot, 'tdaf', 'in', fileName);
+    case 'VW':
+    case 'VOLKSWAGEN':
+      return path.join(env.sftpRoot, 'VW', 'in', fileName);
     default:
       throw new Error(`Client Format not found for ${fileInfo}`);
   }
@@ -432,6 +455,12 @@ export async function updateNfFile(fileDetails: FileDetails): Promise<FileDetail
     await updatePartnerReferenceInXifFile(sourceFilePath, fileDetails.partnerReference);
   }
 
+  // Generate and update VIN for VW files
+  if (fileDetails.client?.toUpperCase() === 'VW' || fileDetails.client?.toUpperCase() === 'VOLKSWAGEN') {
+    const vin = generateVin('VW');
+    await updateSerialNumberInXifFile(sourceFilePath, vin);
+  }
+
   fileDetails.inputFileName = inputFileName;
   const targetPath = buildSftpTarget(fileDetails.fileInfo, inputFileName);
   const targetDir = path.dirname(targetPath);
@@ -465,9 +494,11 @@ export async function createNfFileTilde(fileDetails: FileDetails): Promise<void>
 export async function createNfFile(fileDetails: FileDetails): Promise<void> {
   fileDetails.batchNumber = generateBatchNumber();
 
-  // Use TDAF-specific format for TDAF client
+  // Use client-specific format for partner reference
   if (fileDetails.client?.toUpperCase() === 'TDAF') {
     fileDetails.partnerReference = generateTdafReference();
+  } else if (fileDetails.client?.toUpperCase() === 'VW' || fileDetails.client?.toUpperCase() === 'VOLKSWAGEN') {
+    fileDetails.partnerReference = generateVwReference();
   } else {
     fileDetails.partnerReference = generateA8DigitReference();
   }
@@ -585,9 +616,11 @@ export async function createNfFileByClient(fileDetails: FileDetails): Promise<vo
   if (client === 'GBC' || ext === '.xif') {
     return createNfFile(fileDetails);
   }
-  if (client === 'TDAF' ) {
-
-     return createNfFile(fileDetails);
+  if (client === 'TDAF') {
+    return createNfFile(fileDetails);
+  }
+  if (client === 'VW' || client === 'VOLKSWAGEN') {
+    return createNfFile(fileDetails);
   }
   if (client === 'FORD' || ext === '.fc') {
     return createFordNfFc(fileDetails);

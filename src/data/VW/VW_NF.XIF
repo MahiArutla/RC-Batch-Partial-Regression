@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Xif-Document Version="2.5" Database="ONVW1" Direction="Import">
+	<Batch Number="20260227">
+		<Date Format="yyyy-MM-dd HH:mm:ss">2026-02-27 02:00:08</Date>
+	</Batch>
+	<Registration-List>
+		<New-Registration>
+			<Partner-Reference>2260227001</Partner-Reference>
+			<PPR Province="BC"/>
+			<Contract>
+				<Date Format="yyyy-MM-dd">2026-02-26</Date>
+				<QC.Location>
+					<City>Surrey</City>
+					<Province>BC</Province>
+				</QC.Location>
+				<Type>Lease</Type>
+				<Term Unit="Month">48</Term>
+				<Expiry-Date Format="yyyy-MM-dd">2030-02-26</Expiry-Date>
+				<Maturity-Date Format="yyyy-MM-dd">2030-02-26</Maturity-Date>
+				<Amount>41859.57</Amount>
+			</Contract>
+			<Party-List>
+				<Debtor-Individual-Party>
+					<First-Name>VWDEBTORFN</First-Name>
+					<Middle-Name/>
+					<Last-Name>VWDEBTORLN</Last-Name>
+					<Birth-Date Format="yyyy-MM-dd">1983-04-02</Birth-Date>
+					<Address>
+						<Street>417 14968 101a ave</Street>
+						<City>Surrey</City>
+						<Province>BC</Province>
+						<Postal-Code>V3R 0E8</Postal-Code>
+					</Address>
+					<ON.Notify-Language>English</ON.Notify-Language>
+					<PartyType>1</PartyType>
+				</Debtor-Individual-Party>
+			</Party-List>
+			<Collaterals>
+				<Serial-Collateral>
+					<Category>Motor Vehicle</Category>
+					<Serial-Number>3VV8B7AX7RM202701</Serial-Number>
+					<Make>Volkswagen</Make>
+					<Model>Tiguan Comfortline R-Line</Model>
+					<Year>2026</Year>
+				</Serial-Collateral>
+			</Collaterals>
+		</New-Registration>
+	</Registration-List>
+</Xif-Document>

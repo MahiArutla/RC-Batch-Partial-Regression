@@ -132,6 +132,37 @@ export class DownloadPage {
     downloadDir: string,
     testName: string
   ) {
+    const candidates = [
+      fileDetails.batchNumber,
+      fileDetails.partnerReference,
+      fileDetails.inputFileName,
+    ].filter((v): v is string => Boolean(v && v.trim()));
+
+    let matchedCriteria = false;
+    for (const candidate of candidates) {
+      await this.searchInTable.fill(candidate);
+      try {
+        await expect
+          .poll(
+            async () => {
+              const text = (await this.fileTableResultCount.textContent())?.trim();
+              if (!text) return 0;
+              const num = parseInt(text.split(' total')[0].trim(), 10);
+              return Number.isNaN(num) ? 0 : num;
+            },
+            { timeout: 10000 }
+          )
+          .toBeGreaterThan(0);
+        matchedCriteria = true;
+        break;
+      } catch {
+        // try next candidate
+      }
+    }
+    if (!matchedCriteria) {
+      await this.searchInTable.fill('');
+    }
+
     await expect
       .poll(
         async () => {

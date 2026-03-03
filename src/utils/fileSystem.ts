@@ -263,8 +263,7 @@ export async function updateDischargeFile(filePath: string, fileDetails: FileDet
 
     // Extract batch number from position 4 onwards (skip first 4 zeros)
     // e.g., "0000LON-TDAF2026-02-26 02413499" -> "LON-TDAF2026-02-26 02413499"
-    fileDetails.batchNumber = lines[0].substring(4);
-    fileDetails.batchNumber = fileDetails.batchNumber.replace(/,/g, '');
+    fileDetails.batchNumber = lines[0].substring(4).replace(/,/g, '').trim();
   }
 
   // Update the second line with partner reference
@@ -297,8 +296,7 @@ export async function updateChangeOfProvinceFile(filePath: string, fileDetails: 
 
     // Extract batch number from position 4 onwards (skip first 4 zeros)
     // e.g., "0000LON-TDAF2026-02-26 02413499" -> "LON-TDAF2026-02-26 02413499"
-    fileDetails.batchNumber = lines[0].substring(4);
-    fileDetails.batchNumber = fileDetails.batchNumber.replace(/,/g, '');
+    fileDetails.batchNumber = lines[0].substring(4).replace(/,/g, '').trim();
   }
 
   // Update the second line with partner reference

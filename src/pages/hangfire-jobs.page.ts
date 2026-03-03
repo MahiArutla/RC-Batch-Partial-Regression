@@ -91,7 +91,7 @@ export class HangfireJobsPage {
     console.log('Triggered LVS Hangfire job');
     await this.triggerHFJob('Create JSON');
     console.log('Triggered Create JSON Hangfire job');
-    await this.triggerHFJob('SendToCGe');
+    await this.triggerHFJobWithEnqueue('SendToCGe');
     console.log('Triggered SendToCGe Hangfire job');
    await this.triggerHFJob('Handshake');
     console.log('Triggered Handshake Hangfire job');

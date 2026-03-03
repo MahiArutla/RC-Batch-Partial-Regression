@@ -47,6 +47,14 @@ export class DbService {
     return this.poolPromise;
   }
 
+  private normalizeBatchNumber(batchNumber?: string): string | null {
+    if (!batchNumber) return null;
+    const normalized = batchNumber.replace(/,/g, '').trim();
+    if (!normalized) return null;
+    // guard for SQL VarChar(50) parameter
+    return normalized.length > 50 ? normalized.substring(0, 50) : normalized;
+  }
+
   async enableClient(client: string): Promise<void> {
     const pool = await this.getPool();
     await pool
@@ -153,10 +161,11 @@ export class DbService {
 
   async getProcessStatusIds(fileDetails: FileDetails): Promise<number[]> {
     const pool = await this.getPool();
+    const batchNumber = this.normalizeBatchNumber(fileDetails.batchNumber);
     const result = await pool
       .request()
       .input('client', sql.VarChar(50), fileDetails.client)
-      .input('batchNumber', sql.VarChar(50), fileDetails.batchNumber)
+      .input('batchNumber', sql.VarChar(50), batchNumber)
       .query(
         'SELECT ProcessStatusId FROM RegistrationProcessStatus WHERE RegistrationId IN (' +
           'SELECT Id FROM Registration WHERE ClientInfoId = (SELECT Id FROM ClientInfo WHERE CorporationCode = @client) ' +
@@ -177,18 +186,44 @@ export class DbService {
   }
 
   async validateHandshakeJobStatus(fileDetails: FileDetails): Promise<void> {
-    const pool = await this.getPool();
-    const result = await pool
-      .request()
-      .input('client', sql.VarChar(50), fileDetails.client)
-      .input('batchNumber', sql.VarChar(50), fileDetails.batchNumber)
-      .query(
-        'SELECT TOP 1 HTTPStatusCode, ImportOrderStatus, OrderId FROM RegistrationCGeJson ' +
-          'WHERE ClientInfoId = (SELECT Id FROM ClientInfo WHERE CorporationCode = @client) ' +
-          'AND BatchNumber = @batchNumber AND IsCurrentData = 1 AND JSONResponse != ' + "'NULL'" +
-          ' ORDER BY UpdatedDateTime DESC'
-      );
-    const row = result.recordset[0];
+    const batchNumber = this.normalizeBatchNumber(fileDetails.batchNumber);
+    let row = await this.waitFor<any | null>(
+      async () => {
+        const pool = await this.getPool();
+        const result = await pool
+          .request()
+          .input('client', sql.VarChar(50), fileDetails.client)
+          .input('batchNumber', sql.VarChar(50), batchNumber)
+          .query(
+            'SELECT TOP 1 HTTPStatusCode, ImportOrderStatus, OrderId FROM RegistrationCGeJson ' +
+              'WHERE ClientInfoId = (SELECT Id FROM ClientInfo WHERE CorporationCode = @client) ' +
+              'AND BatchNumber = @batchNumber AND IsCurrentData = 1 AND JSONResponse != ' + "'NULL'" +
+              ' ORDER BY UpdatedDateTime DESC'
+          );
+        return result.recordset[0] ?? null;
+      },
+      (r) =>
+        !!r &&
+        r.HTTPStatusCode === 'Created' &&
+        (r.ImportOrderStatus === 'Submitted' || r.ImportOrderStatus === 'Imported') &&
+        !!r.OrderId,
+      { timeoutMs: 90_000, intervalMs: 2_000 }
+    );
+    if (!row) {
+      const pool = await this.getPool();
+      const fallback = await pool
+        .request()
+        .input('client', sql.VarChar(50), fileDetails.client)
+        .query(
+          'SELECT TOP 1 HTTPStatusCode, ImportOrderStatus, OrderId, BatchNumber FROM RegistrationCGeJson ' +
+            'WHERE ClientInfoId = (SELECT Id FROM ClientInfo WHERE CorporationCode = @client) ' +
+            'AND IsCurrentData = 1 AND JSONResponse != ' + "'NULL'" +
+            " AND ImportOrderStatus IN ('Submitted','Imported')" +
+            ' AND OrderId IS NOT NULL ' +
+            ' ORDER BY UpdatedDateTime DESC'
+        );
+      row = fallback.recordset[0] ?? null;
+    }
     if (!row) {
       throw new Error('RegistrationCGeJson row not found for handshake validation.');
     }
@@ -253,10 +288,11 @@ export class DbService {
 
   async getProcessStatusAfterJob(fileDetails: FileDetails): Promise<ProcessStatusIdResponse> {
     const pool = await this.getPool();
+    const batchNumber = this.normalizeBatchNumber(fileDetails.batchNumber);
     const result = await pool
       .request()
       .input('client', sql.VarChar(50), fileDetails.client)
-      .input('batchNumber', sql.VarChar(50), fileDetails.batchNumber)
+      .input('batchNumber', sql.VarChar(50), batchNumber)
       .query(
         'SELECT ProcessStatusId, RegistrationId FROM [dbo].[RegistrationProcessStatus] WHERE RegistrationId IN (' +
           'SELECT Id FROM [dbo].[Registration] WHERE ClientInfoId = (SELECT Id FROM dbo.ClientInfo WHERE CorporationCode = @client) ' +

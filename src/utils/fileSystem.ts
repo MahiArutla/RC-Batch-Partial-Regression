@@ -379,6 +379,8 @@ function buildNfFileName(fileDetails: FileDetails): string {
       return `PPtoDH_${formatTimestamp()}.XIF`;
     case 'TDAF':
       return `TDC50toPPSA.${formatTimestampWithMillis()}.XIF`;
+    case 'CLEARCHARGE':
+      return `CC_NF_${formatTimestampWithMillis()}.dx2`;
     case 'FORD':
       return `FORD_NF_${formatTimestamp()}.FC`;
     case 'VW':
@@ -440,6 +442,8 @@ function buildSftpTarget(fileInfo: string, fileName: string): string {
       return path.join(env.sftpRoot, 'GBC', 'in', fileName);
     case 'BMO':
       return path.join(env.sftpRoot, 'BMO', 'in', fileName);
+    case 'CLEARCHARGE':
+      return path.join(env.sftpRoot, 'CLEARCHARGE', 'in', fileName);
     case 'TDAF':
       return path.join(env.sftpRoot, 'tdaf', 'in', fileName);
     case 'VW':
@@ -531,6 +535,38 @@ export async function createNfFile(fileDetails: FileDetails): Promise<void> {
   }
 
   await updateNfFile(fileDetails);
+}
+
+export async function createClearChargeNfFile(fileDetails: FileDetails): Promise<void> {
+  const scenarioArtifactsDir = path.join(process.cwd(), 'artifacts', fileDetails.scenarioId);
+  await ensureDirectory(scenarioArtifactsDir);
+
+  const content = await fs.readFile(fileDetails.sampleFile, 'utf-8');
+  const lines = content.split(/\r?\n/);
+  const firstLine = lines[0] ?? '';
+  const headerFields = firstLine.split('^').map((token) => token.trim());
+  const filePrefix = headerFields[1];
+  if (!filePrefix || !headerFields[2]) {
+    throw new Error('Unable to extract ClearCharge batch number from file header.');
+  }
+
+  const paddedBatch = String(Math.floor(100 + Math.random() * 900));
+  const inputFileName = `${filePrefix}${paddedBatch}.dx2`;
+  const sourceFilePath = path.join(scenarioArtifactsDir, inputFileName);
+
+  headerFields[2] = paddedBatch;
+  lines[0] = headerFields.join('^');
+  await fs.writeFile(sourceFilePath, lines.join('\n'), 'utf-8');
+
+  // Middleware status lookups use the numeric batch number for ClearCharge.
+  fileDetails.batchNumber = paddedBatch;
+  fileDetails.inputFileName = inputFileName;
+
+  const targetPath = buildSftpTarget(fileDetails.fileInfo, inputFileName);
+  const targetDir = path.dirname(targetPath);
+  await ensureDirectory(targetDir);
+  await clearDirectory(targetDir);
+  await copyFile(sourceFilePath, targetPath);
 }
 
 export async function createFordNfFc(fileDetails: FileDetails): Promise<void> {
@@ -642,6 +678,9 @@ export async function createNfFileByClient(fileDetails: FileDetails): Promise<vo
   const client = (fileDetails.client || '').toUpperCase();
   if (client === 'GBC' || ext === '.xif') {
     return createNfFile(fileDetails);
+  }
+  if (client === 'CLEARCHARGE' || ext === '.dx2') {
+    return createClearChargeNfFile(fileDetails);
   }
   if (client === 'TDAF') {
     return createNfFile(fileDetails);

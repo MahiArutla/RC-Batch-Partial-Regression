@@ -104,19 +104,35 @@ export class DbService {
         'SELECT TOP 1 UniqueId FROM ClientFileScheduleInfo ' +
         'WHERE ClientFileInfoId IN (' +
         'SELECT Id FROM ClientFileInfo WHERE ClientInfoId = (SELECT Id FROM ClientInfo WHERE CorporationCode = @client) ' +
-        'AND Description = @description) AND IsEnabled = 1';
+        "AND Description LIKE '%' + @description + '%') AND IsEnabled = 1";
     }
 
     if (!description) {
       throw new Error(`Missing description for ${type} file.`);
     }
 
-    const result = await pool
+    let result = await pool
       .request()
       .input('client', sql.VarChar(50), fileDetails.client)
       .input('description', sql.VarChar(200), description as string)
       .query(query);
-    const uniqueId: string | undefined = result.recordset[0]?.UniqueId;
+    let uniqueId: string | undefined = result.recordset[0]?.UniqueId;
+
+    if (!uniqueId && type === 'NF') {
+      // Fallback for client setups where NF input description wording differs (e.g., "Billing Input File" vs "Billing File").
+      result = await pool
+        .request()
+        .input('client', sql.VarChar(50), fileDetails.client)
+        .query(
+          'SELECT TOP 1 cfsi.UniqueId FROM ClientFileScheduleInfo cfsi ' +
+          'INNER JOIN ClientFileInfo cfi ON cfi.Id = cfsi.ClientFileInfoId ' +
+          'INNER JOIN ClientInfo ci ON ci.Id = cfi.ClientInfoId ' +
+          'WHERE ci.CorporationCode = @client AND cfsi.IsEnabled = 1 ' +
+          "AND cfi.Description LIKE '%Billing%' AND cfi.Description LIKE '%File%'"
+        );
+      uniqueId = result.recordset[0]?.UniqueId;
+    }
+
     if (!uniqueId) {
       throw new Error(`UniqueId not found for ${fileDetails.scenarioId} (${type}).`);
     }

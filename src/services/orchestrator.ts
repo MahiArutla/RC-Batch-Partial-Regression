@@ -156,7 +156,8 @@ export class Orchestrator {
     sampleFileName: string,
     testName: string,
     province: string,
-    partnerReference: string
+    partnerReference: string,
+    baseRegistrationNum?: string
   ): Promise<FileDetails> {
     const fileDetails = loadScenarioData(scenarioId);
     const localSample = path.resolve(process.cwd(), 'src', 'data', client, sampleFileName);
@@ -165,6 +166,9 @@ export class Orchestrator {
     fileDetails.fileInfo = client;
     fileDetails.scenarioId = scenarioId;
     fileDetails.partnerReference = partnerReference;
+    if (baseRegistrationNum) {
+      fileDetails.baseRegistrationNum = baseRegistrationNum;
+    }
 
     await fileSystem.createDischargeFile(fileDetails);
 
@@ -195,6 +199,23 @@ export class Orchestrator {
       path.join(process.cwd(), 'artifacts', testName, fileDetails.summaryReportFileName!)
     );
     console.log('Summary report file downloaded and verified:', fileDetails.summaryReportFileName);
+
+    if (!fileDetails.returnFileDescription) {
+      throw new Error(
+        `ReturnFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the Return UniqueId.`
+      );
+    }
+    fileDetails.downloadFileType = 'ReturnFile';
+    await this.downloadAndValidateReturnFileWithRetry(
+      page,
+      db,
+      hangfirePage,
+      downloadPage,
+      fileDetails,
+      downloadDir,
+      testName
+    );
 
     console.log(
       `Discharge file processed with Batchnumber ${fileDetails.batchNumber}, ` +

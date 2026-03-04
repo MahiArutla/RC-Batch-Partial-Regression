@@ -244,6 +244,28 @@ export async function updateRenewalFile(filePath: string, fileDetails: FileDetai
 
 export async function updateDischargeFile(filePath: string, fileDetails: FileDetails): Promise<void> {
   const content = await fs.readFile(filePath, 'utf-8');
+  const client = (fileDetails.client || '').toUpperCase();
+
+  // Handle VW discharge files (fixed-width format)
+  if (client === 'VW' || client === 'VOLKSWAGEN') {
+    let updatedContent = content;
+
+    // Replace REGTNUM with baseRegistrationNum
+    if (fileDetails.baseRegistrationNum) {
+      updatedContent = updatedContent.replace(/REGTNUM/g, fileDetails.baseRegistrationNum);
+    } else {
+      throw new Error('baseRegistrationNum from cycle 1 is undefined for VW discharge');
+    }
+
+    // Set batch number (extract from file content if needed)
+    // For VW, the batch number might be in a different format
+    fileDetails.batchNumber = fileDetails.batchNumber || path.basename(filePath, path.extname(filePath));
+
+    await fs.writeFile(filePath, updatedContent, 'utf-8');
+    return;
+  }
+
+  // Handle TDAF discharge files (line-based format)
   const lines = content.split(/\r?\n/);
 
   if (lines.length > 0) {
@@ -387,6 +409,13 @@ function buildDischargeFileName(fileDetails: FileDetails): string {
       const mm = String(now.getMonth() + 1).padStart(2, '0');
       const dd = String(now.getDate()).padStart(2, '0');
       return `TDAF_Discharge_${yyyy}${mm}${dd}.txt`;
+    case 'VW':
+    case 'VOLKSWAGEN':
+      const nowVW = new Date();
+      const yyyyVW = nowVW.getFullYear();
+      const mmVW = String(nowVW.getMonth() + 1).padStart(2, '0');
+      const ddVW = String(nowVW.getDate()).padStart(2, '0');
+      return `CSRSDischarge${mmVW}${ddVW}${yyyyVW}.txt`;
     default:
       return `DEFAULT_${formatTimestamp()}.txt`;
   }

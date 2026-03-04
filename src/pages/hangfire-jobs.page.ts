@@ -23,6 +23,7 @@ export class HangfireJobsPage {
   private readonly enqueuedJobsSelectAllCheckbox: Locator;
   private readonly enqueuedJobsTriggerButton: Locator;
   private readonly hangfireFrame: FrameLocator;
+  private readonly recurringJobsLink: Locator;
 
   constructor(private readonly page: Page) {
     this.hangfireDashboard = page.locator("//ul/li/a/span[text()='HangFire Dashboard']");
@@ -44,6 +45,7 @@ export class HangfireJobsPage {
     this.scheduledJobsCount = this.hangfireFrame.locator("//a[@href='/hangfiredashboard/hangfire/jobs/scheduled']/span/span");
     this.enqueuedJobsSelectAllCheckbox = this.hangfireFrame.locator("//input[@class='js-jobs-list-select-all']");
     this.enqueuedJobsTriggerButton = this.hangfireFrame.locator("//button[@data-url='/hangfiredashboard/hangfire/jobs/scheduled/enqueue']");
+    this.recurringJobsLink = this.hangfireFrame.locator("//a[contains(text(),'Recurring Jobs')]");
   }
 
   async goToHFJobs(db: any, fileDetails: any): Promise<void> {
@@ -76,12 +78,12 @@ export class HangfireJobsPage {
     await db.validateHandshakeJobStatus(fileDetails);
     console.log('Handshake job status validated in DB');
   }
-  async goToProcessHFJobs(db: any, fileDetails: any): Promise<void> {
+  async goToProcessHFJobs(db: any, fileDetails: any, fastMode: boolean = false): Promise<void> {
     await this.hangfireDashboard.click();
     await this.hfJobs.click();
     await this.hfDashboardTab.click();
     await this.hfDbRecurringJobsTab.click();
-    await this.triggerHFJobWithEnqueue('ClientFileScheduler');
+    await this.triggerHFJobWithEnqueue('ClientFileScheduler', fastMode);
     console.log('Triggered ClientFileScheduler Hangfire job');
     await db.validateClientFileSchedulerJobFileStatusInDB(fileDetails);
     console.log('File got picked up from SFTP & File status and process status validated in DB for ClientFileScheduler job ');
@@ -91,7 +93,7 @@ export class HangfireJobsPage {
     console.log('Triggered LVS Hangfire job');
     await this.triggerHFJob('Create JSON');
     console.log('Triggered Create JSON Hangfire job');
-    await this.triggerHFJobWithEnqueue('SendToCGe');
+    await this.triggerHFJobWithEnqueue('SendToCGe', fastMode);
     console.log('Triggered SendToCGe Hangfire job');
    await this.triggerHFJob('Handshake');
     console.log('Triggered Handshake Hangfire job');
@@ -118,12 +120,12 @@ export class HangfireJobsPage {
       const TriggerNowBttn = this.hangfireFrame.locator(`//button[normalize-space()='Trigger now']`);
       await expect(TriggerNowBttn).toBeEnabled();
       await TriggerNowBttn.click();
-      await this.page.waitForTimeout(1000);
+      await this.page.waitForTimeout(250);
     } catch (error) {
       console.log(error);
     }
   }
-  async triggerHFJobWithEnqueue(job: string): Promise<void> {
+  async triggerHFJobWithEnqueue(job: string, fastMode: boolean = false): Promise<void> {
     try {
       const tableText = await this.recurringJobTable.textContent();
       if (!tableText?.includes(job)) {
@@ -131,19 +133,20 @@ export class HangfireJobsPage {
       }
       const jobElement = this.hangfireFrame.locator(`//div[@class='js-jobs-list']/div[2]/table/tbody/tr/td/input[@value='${job}']`);
       await jobElement.click();
-      await this.checkScheduledProcessingHFJobCount();
-      await this.hangfireFrame.locator("//a[contains(text(),'Recurring Jobs')]").click();
+      await this.checkScheduledProcessingHFJobCount(fastMode);
+      await this.recurringJobsLink.click();
     } catch (error) {
       console.log(error);
     }
   }
-  async checkScheduledProcessingHFJobCount(): Promise<void> {
+  async checkScheduledProcessingHFJobCount(fastMode: boolean = false): Promise<void> {
     await this.triggerNow.click();
-    await this.page.waitForTimeout(1000);
+    await this.page.waitForTimeout(fastMode ? 250 : 1000);
     await this.hangFireJobs.click();
-    await this.page.waitForTimeout(1000);
-    for (let i = 0; i < 3; i++) {
-      await this.scheduledJobsCountMethod();
+    await this.page.waitForTimeout(fastMode ? 250 : 1000);
+    const rounds = fastMode ? 1 : 3;
+    for (let i = 0; i < rounds; i++) {
+      await this.scheduledJobsCountMethod(fastMode);
       await this.processingJobsCount();
     }
   }
@@ -168,7 +171,7 @@ export class HangfireJobsPage {
     });
   }
 
-  async scheduledJobsCountMethod(): Promise<void> {
+  async scheduledJobsCountMethod(fastMode: boolean = false): Promise<void> {
     try {
       await expect(this.scheduledJobs).toBeEnabled();
       await this.scheduledJobs.click();
@@ -176,10 +179,10 @@ export class HangfireJobsPage {
       const schCountVal = parseInt(schCountText || '0', 10);
       if (schCountVal > 0) {
         await expect(this.enqueuedJobsSelectAllCheckbox).toBeEnabled();
-        await this.page.waitForTimeout(2000);
+        await this.page.waitForTimeout(fastMode ? 250 : 2000);
         await this.enqueuedJobsSelectAllCheckbox.click();
         await this.enqueuedJobsTriggerButton.click();
-        await this.page.waitForTimeout(2000);
+        await this.page.waitForTimeout(fastMode ? 250 : 2000);
       }
     } catch (error) {
       console.log(error);

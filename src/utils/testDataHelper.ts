@@ -86,7 +86,21 @@ export class TestDataHelper {
     // If relative, try joining with src/data folder and client folder when provided
     const dataRoot = path.resolve(__dirname, '../data');
     if (client) {
-      return path.join(dataRoot, client, sampleFileRaw);
+      const byClient = path.join(dataRoot, client, sampleFileRaw);
+      if (fs.existsSync(byClient)) {
+        return byClient;
+      }
+
+      // Some clients keep sample files flat under src/data (for example: src/data/clearcharge).
+      const byRootSample = path.join(dataRoot, sampleFileRaw);
+      if (fs.existsSync(byRootSample)) {
+        return byRootSample;
+      }
+
+      const byRootClientName = path.join(dataRoot, client);
+      if (fs.existsSync(byRootClientName)) {
+        return byRootClientName;
+      }
     }
     return path.join(dataRoot, sampleFileRaw);
   }

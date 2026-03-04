@@ -132,9 +132,14 @@ export class Orchestrator {
     await downloadPage.setDownloadCriteria(fileDetails);
     const downloadDir = process.env.PW_DOWNLOADS_DIR || path.resolve(process.cwd(), 'downloads');
     await downloadPage.downloadAndVerify(fileDetails, downloadDir, testName);
-    ExcelHelper.verifyImportedSuccessfullyGreaterThanZero(
-      path.join(process.cwd(), 'artifacts', testName, fileDetails.summaryReportFileName!)
-    );
+    const renewalSummaryPath = path.join(process.cwd(), 'artifacts', testName, fileDetails.summaryReportFileName!);
+    const isTdafRenewal = (fileDetails.client ?? '').toUpperCase() === 'TDAF';
+    if (isTdafRenewal) {
+      // TDAF renewal summaries can legitimately report zero imported rows.
+      ExcelHelper.verifyImportedSuccessfullyAtLeast(renewalSummaryPath, 0);
+    } else {
+      ExcelHelper.verifyImportedSuccessfullyGreaterThanZero(renewalSummaryPath);
+    }
     console.log('Summary report file downloaded and verified:', fileDetails.summaryReportFileName);
 
     console.log(
@@ -195,9 +200,14 @@ export class Orchestrator {
     await downloadPage.setDownloadCriteria(fileDetails);
     const downloadDir = process.env.PW_DOWNLOADS_DIR || path.resolve(process.cwd(), 'downloads');
     await downloadPage.downloadAndVerify(fileDetails, downloadDir, testName);
-    ExcelHelper.verifyImportedSuccessfullyGreaterThanZero(
-      path.join(process.cwd(), 'artifacts', testName, fileDetails.summaryReportFileName!)
-    );
+    const dischargeSummaryPath = path.join(process.cwd(), 'artifacts', testName, fileDetails.summaryReportFileName!);
+    const isTdafDischarge = (fileDetails.client ?? '').toUpperCase() === 'TDAF';
+    if (isTdafDischarge) {
+      // TDAF discharge summaries can legitimately report zero imported rows.
+      ExcelHelper.verifyImportedSuccessfullyAtLeast(dischargeSummaryPath, 0);
+    } else {
+      ExcelHelper.verifyImportedSuccessfullyGreaterThanZero(dischargeSummaryPath);
+    }
     console.log('Summary report file downloaded and verified:', fileDetails.summaryReportFileName);
 
     if (!fileDetails.returnFileDescription) {

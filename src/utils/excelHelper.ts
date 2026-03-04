@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 import { expect } from '@playwright/test';
 
 export class ExcelHelper {
-  static verifyImportedSuccessfullyGreaterThanZero(filePath: string) {
+  static getImportedSuccessfully(filePath: string): number {
     const fs = require('fs');
     if (!fs.existsSync(filePath)) {
       throw new Error(`Excel file not found at path: ${filePath}`);
@@ -27,14 +27,21 @@ export class ExcelHelper {
       throw new Error('GrandTotal row not found in sheet');
     }
 
-    const importedSuccessfully =
-      Number(grandTotalRow['Imported Successfully']);
+    return Number(grandTotalRow['Imported Successfully']);
+  }
+
+  static verifyImportedSuccessfullyAtLeast(filePath: string, minValue: number) {
+    const importedSuccessfully = ExcelHelper.getImportedSuccessfully(filePath);
 
     console.log(
       'GrandTotal - Imported Successfully:',
       importedSuccessfully
     );
 
-    expect(importedSuccessfully).toBeGreaterThan(0);
+    expect(importedSuccessfully).toBeGreaterThanOrEqual(minValue);
+  }
+
+  static verifyImportedSuccessfullyGreaterThanZero(filePath: string) {
+    ExcelHelper.verifyImportedSuccessfullyAtLeast(filePath, 1);
   }
 }

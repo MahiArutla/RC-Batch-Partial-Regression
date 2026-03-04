@@ -43,8 +43,7 @@ export class DownloadPage {
     await this.downloadFileNav.waitFor({ state: 'visible', timeout: 20000 });
     await this.downloadFileNav.click();
     await this.page.waitForLoadState('networkidle');
-
-    await this.page.waitForTimeout(5000);
+    await this.page.waitForTimeout(1500);
     await selectMatValue(this.page, 'corportionid', fileDetails.client);
     await selectMatValue(this.page, 'filetype', fileDetails.downloadFileType);
 

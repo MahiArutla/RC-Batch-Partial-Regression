@@ -259,7 +259,7 @@ export class Orchestrator {
     fileDetails.batchType = 'COP';
     await db.setProcessAndFileStatusToNotStarted(fileDetails);
     const hangfirePage = new HangfireJobsPage(page);
-    await hangfirePage.goToProcessHFJobs(db, fileDetails);
+    await hangfirePage.goToProcessHFJobs(db, fileDetails, true);
     await db.validateHandshakeJobStatus(fileDetails);
     console.log('Handshake job status validated in DB');
 
@@ -594,9 +594,18 @@ export class Orchestrator {
     const isVwClient =
       (fileDetails.client ?? '').toUpperCase() === 'VW' ||
       (fileDetails.client ?? '').toUpperCase() === 'VOLKSWAGEN';
+    const isTdafClient = (fileDetails.client ?? '').toUpperCase() === 'TDAF';
     const batchFound = fileDetails.batchNumber
       ? normalizedContent.includes(normalize(fileDetails.batchNumber))
       : true;
+    if (isTdafClient) {
+      // TDAF discharge return files can be an empty Registration-List payload and may not echo partner reference/batch.
+      if (!fileContent.includes('<Registration-List')) {
+        throw new Error(`Unexpected TDAF return XML format in ${fileDetails.returnFileName}`);
+      }
+      console.log(`TDAF Return File ${fileDetails.returnFileName} downloaded with valid XML structure`);
+      return;
+    }
     if (!referenceFound) {
       throw new Error(
         `${fileDetails.partnerReference} ` +

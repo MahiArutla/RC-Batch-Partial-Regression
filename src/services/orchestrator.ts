@@ -556,7 +556,7 @@ export class Orchestrator {
     fileDetails.batchType = 'NF';
     await db.setProcessAndFileStatusToNotStarted(fileDetails);
     const hangfirePage = new HangfireJobsPage(page);
-    await hangfirePage.goToHFJobs(db, fileDetails);
+    await hangfirePage.goToProcessHFJobs(db, fileDetails);
     const manualProcessingService = new ManualProcessingService();
     const manualResponse = await manualProcessingService.processManualTransaction(fileDetails, 'BC', 'superuser');
     console.log('Manual Processing API response:', manualResponse);

@@ -10,6 +10,7 @@ import { DownloadPage } from '../pages/download.page';
 import { ExcelHelper } from '../utils/excelHelper';
 import { loadScenarioData } from '../data/testData';
 import { ManualProcessingService } from './manualProcessingService';
+import { loadEnv } from '../config/env';
 
 export class Orchestrator {
   // ─────────────────────────────────────────────────────────────────────────────
@@ -259,6 +260,7 @@ export class Orchestrator {
     fileDetails.partnerReference = partnerReference;
 
     await fileSystem.createChangeOfProvinceFile(fileDetails);
+    await page.waitForTimeout(2000);
 
     if (!fileDetails.inputFileDescription) {
       throw new Error(
@@ -271,7 +273,7 @@ export class Orchestrator {
     fileDetails.batchType = 'COP';
     await db.setProcessAndFileStatusToNotStarted(fileDetails);
     const hangfirePage = new HangfireJobsPage(page);
-    await hangfirePage.goToProcessHFJobs(db, fileDetails, true);
+    await hangfirePage.goToProcessHFJobs(db, fileDetails, false);
     await db.validateHandshakeJobStatus(fileDetails);
     console.log('Handshake job status validated in DB');
 
@@ -297,6 +299,93 @@ export class Orchestrator {
       `filename ${fileDetails.inputFileName}  PartnerReference ${fileDetails.partnerReference} ` +
       `and OrderId ${fileDetails.orderId}`
     );
+
+    return fileDetails;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Greenlight Discharge Happy Path (TDAF)
+  // ─────────────────────────────────────────────────────────────────────────────
+  async runGreenlightDischargeHappyPath(
+    page: Page,
+    scenarioId: string,
+    client: string,
+    sampleFileName: string,
+    testName: string,
+    province: string,
+    partnerReference: string
+  ): Promise<FileDetails> {
+    const fileDetails = loadScenarioData(scenarioId);
+    const localSample = path.resolve(process.cwd(), 'src', 'data', client, sampleFileName);
+    fileDetails.sampleFile = localSample;
+    fileDetails.client = client;
+    fileDetails.fileInfo = client;
+    fileDetails.scenarioId = scenarioId;
+    fileDetails.partnerReference = partnerReference;
+
+    await fileSystem.createGreenlightDischargeFile(fileDetails);
+
+    // Greenlight discharge uses greenlightDischargeFileDescription for DB lookup
+    if (!fileDetails.greenlightDischargeFileDescription) {
+      throw new Error(
+        `GreenlightDischargeFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the Greenlight Discharge UniqueId.`
+      );
+    }
+
+        // Set greenlightDischargeFileDescription so the DB utility can use it for GreenlightDischarge batch type
+    fileDetails.greenlightDischargeFileDescription = fileDetails.greenlightDischargeFileDescription;
+
+    const db = new DbService();
+    fileDetails.batchType = 'GreenlightDischarge';
+    await db.setProcessAndFileStatusToNotStarted(fileDetails);
+
+    // Wait to ensure file system propagation
+    await page.waitForTimeout(3000);
+
+    const hangfirePage = new HangfireJobsPage(page);
+
+   await hangfirePage.goToProcessHFJobs(db, fileDetails, false);
+    await db.validateHandshakeJobStatus(fileDetails);
+   
+     const manualProcessingService = new ManualProcessingService();
+    const manualResponse = await manualProcessingService.processManualTransaction(fileDetails, province, 'superuser');
+    console.log('Manual Processing API response:', manualResponse);
+
+    // Download return file for greenlight discharge
+    if (!fileDetails.returnFileDescription) {
+      throw new Error(
+        `ReturnFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the Return UniqueId.`
+      );
+    }
+
+    const downloadPage = new DownloadPage(page);
+    const downloadDir = process.env.PW_DOWNLOADS_DIR || path.resolve(process.cwd(), 'downloads');
+
+    // Preserve original batchType before return file processing
+    const originalBatchType = fileDetails.batchType;
+
+    fileDetails.downloadFileType = 'ReturnFile';
+    await this.downloadAndValidateReturnFileWithRetry(
+      page,
+      db,
+      hangfirePage,
+      downloadPage,
+      fileDetails,
+      downloadDir,
+      testName
+    );
+
+    // Restore original batchType
+    fileDetails.batchType = originalBatchType;
+
+    console.log('✓ Greenlight Discharge completed successfully');
+    console.log(`  File: ${fileDetails.inputFileName}`);
+    console.log(`  Partner Reference from Cycle 1: ${fileDetails.partnerReference}`);
+    console.log(`  Batch Type: ${fileDetails.batchType}`);
+    console.log(`  Description: ${fileDetails.greenlightDischargeFileDescription}`);
+    console.log(`  Return File: ${fileDetails.returnFileName}`);
 
     return fileDetails;
   }

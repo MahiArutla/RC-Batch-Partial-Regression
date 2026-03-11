@@ -117,8 +117,12 @@ export class HangfireJobsPage {
       const jobElement = this.hangfireFrame.locator(`//div[@class='js-jobs-list']/div[2]/table/tbody/tr/td/input[@value='${job}']`);
       await expect(jobElement).toBeEnabled();
       await jobElement.click();
+      await this.page.waitForTimeout(500);
       const TriggerNowBttn = this.hangfireFrame.locator(`//button[normalize-space()='Trigger now']`);
-      await expect(TriggerNowBttn).toBeEnabled();
+
+      // Wait longer for button to become enabled (up to 60 seconds)
+      // The button might be disabled from a previous job trigger
+      await expect(TriggerNowBttn).toBeEnabled({ timeout: 60000 });
       await TriggerNowBttn.click();
       await this.page.waitForTimeout(250);
     } catch (error) {

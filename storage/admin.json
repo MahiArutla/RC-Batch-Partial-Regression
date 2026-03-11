@@ -10,7 +10,7 @@
         },
         {
           "name": "TERANET-DASHBOARD_token",
-          "value": "{\"token\":\"eyJhbGciOiJodHRwOi8vd3d3LnczLm9yZy8yMDAxLzA0L3htbGRzaWctbW9yZSNobWFjLXNoYTI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJSQ0JBVENIQVVUT1VTRVJAdHJhZGVyLmNhIiwianRpIjoiYjM0NzE5ZjQtMTMyYy00OTMzLWExNDYtOTg5NjgwOWE1MmM0IiwiZXhwIjoxNzcyNzk0NTU1LCJpc3MiOiJUZXJhbmV0X0NHRUNEIiwiYXVkIjoiVGVyYW5ldF9DR0VDRCJ9.MGatG5tjaOD2E5zZ4VrrvhHJ40owWgpMywLtVcLbMyU\",\"expiration\":\"2026-03-06 05:55:55\"}"
+          "value": "{\"token\":\"eyJhbGciOiJodHRwOi8vd3d3LnczLm9yZy8yMDAxLzA0L3htbGRzaWctbW9yZSNobWFjLXNoYTI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJSQ0JBVENIQVVUT1VTRVJAdHJhZGVyLmNhIiwianRpIjoiNWM3NzI2Y2UtYWVjNi00YjY2LThmY2EtZTk1OGY0ZWU5ZDFlIiwiZXhwIjoxNzczMzQ3NTcxLCJpc3MiOiJUZXJhbmV0X0NHRUNEIiwiYXVkIjoiVGVyYW5ldF9DR0VDRCJ9.JrdCCeVheY3UK7uqO2S_Hw-T5MB-5Iqckf_xFSTzpkM\",\"expiration\":\"2026-03-12 16:32:51\"}"
         }
       ]
     }

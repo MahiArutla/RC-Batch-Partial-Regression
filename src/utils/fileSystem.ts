@@ -423,6 +423,14 @@ function buildDischargeFileName(fileDetails: FileDetails): string {
   }
 }
 
+function buildGreenlightDischargeFileName(): string {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return `csrsdis.${yyyy}${mm}${dd}.txt`;
+}
+
 function buildChangeOfProvinceFileName(fileDetails: FileDetails): string {
   switch (fileDetails.client.toUpperCase()) {
     case 'TDAF':
@@ -750,5 +758,70 @@ export async function createChangeOfProvinceFile(fileDetails: FileDetails): Prom
   await clearDirectory(targetDir);
   await copyFile(sourceFilePath, targetPath);
   fileDetails.inputFileName = inputFileName;
+}
+
+export async function verifyTdafHandshakeFileExists(fileDetails: FileDetails): Promise<string> {
+  const handshakeDir = path.join(env.sftpRoot, 'tdaf', 'handshake');
+
+  const files = await fs.readdir(handshakeDir);
+
+  const handshakePattern = /^Fiserv_HandShake_Batch_.*\.csv$/i;
+  const matchingFiles = files.filter(f => handshakePattern.test(f));
+
+  if (matchingFiles.length === 0) {
+    throw new Error(
+      `No handshake file found in ${handshakeDir}. ` +
+      `Expected file pattern: Fiserv_HandShake_Batch_*.csv`
+    );
+  }
+
+  const latestFile = matchingFiles.sort().reverse()[0];
+  const fullPath = path.join(handshakeDir, latestFile);
+
+  const exists = await pathExists(fullPath);
+  if (!exists) {
+    throw new Error(`Handshake file not found: ${fullPath}`);
+  }
+
+  console.log(`✓ Handshake file verified: ${latestFile}`);
+  return fullPath;
+}
+
+export async function createGreenlightDischargeFile(fileDetails: FileDetails): Promise<void> {
+  const scenarioArtifactsDir = path.join(process.cwd(), 'artifacts', fileDetails.scenarioId);
+  await ensureDirectory(scenarioArtifactsDir);
+
+  const inputFileName = buildGreenlightDischargeFileName();
+  const sourceFilePath = path.join(scenarioArtifactsDir, inputFileName);
+  await copyFile(fileDetails.sampleFile, sourceFilePath);
+
+  await updateGreenlightDischargeFile(sourceFilePath, fileDetails);
+
+  const targetPath = path.join(env.sftpRoot, 'tdaf', 'in', inputFileName);
+  const targetDir = path.dirname(targetPath);
+  await ensureDirectory(targetDir);
+  await clearDirectory(targetDir);
+  await copyFile(sourceFilePath, targetPath);
+  fileDetails.inputFileName = inputFileName;
+}
+
+async function updateGreenlightDischargeFile(filePath: string, fileDetails: FileDetails): Promise<void> {
+  const content = await fs.readFile(filePath, 'utf-8');
+  const lines = content.split(/\r?\n/);
+
+  // Greenlight Discharge has special format:
+  // Line 0: "RECORD COUNT:     0000000001" (keep as-is)
+  // Line 1: "0000PARTNRREF RAQUEL EVARDO" (replace PARTNRREF with partner reference from cycle 1)
+
+  // Replace partner reference in line 1
+  if (lines.length >= 2 && fileDetails.partnerReference) {
+    lines[1] = lines[1].replace(/PARTNRREF/g, fileDetails.partnerReference);
+  }
+
+  // For Greenlight Discharge, use the filename without extension as batch number (e.g., csrsdis.20260311)
+  const fileName = path.basename(filePath, '.txt');
+  fileDetails.batchNumber = fileName;
+
+  await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
 }
 

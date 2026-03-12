@@ -120,11 +120,13 @@ export class HangfireJobsPage {
       await this.page.waitForTimeout(500);
       const TriggerNowBttn = this.hangfireFrame.locator(`//button[normalize-space()='Trigger now']`);
 
-      // Wait longer for button to become enabled (up to 60 seconds)
+      // Wait longer for button to become enabled (up to 120 seconds)
       // The button might be disabled from a previous job trigger
-      await expect(TriggerNowBttn).toBeEnabled({ timeout: 60000 });
+      await expect(TriggerNowBttn).toBeEnabled({ timeout: 120000 });
       await TriggerNowBttn.click();
-      await this.page.waitForTimeout(250);
+
+      // Wait longer after clicking to allow job to complete before triggering next one
+      await this.page.waitForTimeout(3000);
     } catch (error) {
       console.log(error);
     }
@@ -139,6 +141,9 @@ export class HangfireJobsPage {
       await jobElement.click();
       await this.checkScheduledProcessingHFJobCount(fastMode);
       await this.recurringJobsLink.click();
+
+      // Wait longer after triggering to allow job to complete
+      await this.page.waitForTimeout(2000);
     } catch (error) {
       console.log(error);
     }

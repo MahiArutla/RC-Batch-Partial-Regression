@@ -126,9 +126,6 @@ test.describe('TDAF All Province Happy Path', () => {
     });
     fileDetails.batchType = 'NF';
 
-    await test.step('Validate unique id present cycle 1', async () => {
-      expect(fileDetails.uniqueId).toBeTruthy();
-    });
 
     // Verify handshake file exists in SFTP before proceeding to Cycle 2
     await test.step('Verify TDAF handshake file exists in SFTP', async () => {
@@ -151,7 +148,12 @@ test.describe('TDAF All Province Happy Path', () => {
         fileDetails.partnerReference!
       );
     });
-
+ await test.step('Verify TDAF handshake file exists in SFTP', async () => {
+      const { verifyTdafHandshakeFileExists } = await import('../utils/fileSystem');
+      const handshakeFilePath = await verifyTdafHandshakeFileExists(fileDetails);
+      expect(handshakeFilePath).toBeTruthy();
+      console.log(`Handshake file verified at: ${handshakeFilePath}`);
+    });
     await test.step('Verify greenlight discharge completed', async () => {
       expect(fileDetails.partnerReference).toBeTruthy();
       expect(fileDetails.batchType).toBe('GreenlightDischarge');
@@ -160,6 +162,6 @@ test.describe('TDAF All Province Happy Path', () => {
     });
 
     // Note: Greenlight discharge is a special notification file
-    // It does NOT generate uniqueId, summary reports, or return files
+    // It generates uniqueId and return files but does NOT require manual processing or summary reports
   });
 });

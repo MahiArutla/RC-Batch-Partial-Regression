@@ -3,7 +3,7 @@ import path from 'path';
 import { readFileSync, writeFileSync } from 'fs';
 import { loadEnv } from '../config/env';
 import { FileDetails } from '../models/fileDetails';
-import { generateA8DigitReference, generateBatchNumber, generateBmoInputFileName, generateFordReference, generateTdafReference, generateVwReference, generateVin } from './random';
+import { generateBatchNumber, generateBmoInputFileName, generateFordReference, generateTdafReference, generateVwReference, generateVin } from './random';
 
 const env = loadEnv();
 
@@ -823,5 +823,73 @@ async function updateGreenlightDischargeFile(filePath: string, fileDetails: File
   fileDetails.batchNumber = fileName;
 
   await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
+}
+
+function buildBnsCommExternalFileName(): string {
+  // Use same format as BNS_COMM NF
+  return `xifdoc${formatAdjustedTimestamp()}.XML`;
+}
+
+async function updateBnsCommExternalFile(filePath: string, fileDetails: FileDetails): Promise<void> {
+  let content = await fs.readFile(filePath, 'utf-8');
+
+  // Generate new partner reference
+  const partnerRef = fileDetails.partnerReference || generateBmoInputFileName();
+  fileDetails.partnerReference = partnerRef;
+  console.log(`Generated Partner Reference: ${partnerRef}`);
+
+  // Generate registration number in format: 6 digits + 1 letter (e.g., 223828A)
+  if (!fileDetails.baseRegistrationNum) {
+    const sixDigits = Math.floor(100000 + Math.random() * 900000); // Random 6-digit number
+    const letter = String.fromCharCode(65 + Math.floor(Math.random() * 26)); // Random A-Z
+    fileDetails.baseRegistrationNum = `${sixDigits}${letter}`;
+  }
+  const registrationNum = fileDetails.baseRegistrationNum;
+  console.log(`Generated Registration Number: ${registrationNum}`);
+
+  const batchNumber = generateBatchNumber();
+  fileDetails.batchNumber = batchNumber;
+
+  // Update Partner-Reference
+  content = content.replace(/BNS_COMM_RefNum/g, partnerRef);
+
+  // Update Registration-Number inside PPR block (hardcoded value 240607B)
+  content = content.replace(
+    /<Registration-Number>[^<]*<\/Registration-Number>/g,
+    `<Registration-Number>${registrationNum}</Registration-Number>`
+  );
+
+  // Update PPR-Registration-Number (hardcoded value 240607A)
+  content = content.replace(
+    /<PPR-Registration-Number>[^<]*<\/PPR-Registration-Number>/g,
+    `<PPR-Registration-Number>${registrationNum}</PPR-Registration-Number>`
+  );
+
+  // Update Batch Number
+  content = content.replace(/<Batch Number="[^"]*">/g, `<Batch Number="${batchNumber}">`);
+
+  console.log(`✓ Updated Registration-Number to: ${registrationNum}`);
+  console.log(`✓ Updated PPR-Registration-Number to: ${registrationNum}`);
+  console.log(`✓ Updated Batch Number to: ${batchNumber}`);
+
+  await fs.writeFile(filePath, content, 'utf-8');
+}
+
+export async function createBnsCommExternalFile(fileDetails: FileDetails): Promise<void> {
+  const scenarioArtifactsDir = path.join(process.cwd(), 'artifacts', fileDetails.scenarioId);
+  await ensureDirectory(scenarioArtifactsDir);
+
+  const inputFileName = buildBnsCommExternalFileName();
+  const sourceFilePath = path.join(scenarioArtifactsDir, inputFileName);
+  await copyFile(fileDetails.sampleFile, sourceFilePath);
+
+  await updateBnsCommExternalFile(sourceFilePath, fileDetails);
+
+  const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', inputFileName);
+  const targetDir = path.dirname(targetPath);
+  await ensureDirectory(targetDir);
+  await clearDirectory(targetDir);
+  await copyFile(sourceFilePath, targetPath);
+  fileDetails.inputFileName = inputFileName;
 }
 

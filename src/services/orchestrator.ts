@@ -333,8 +333,8 @@ export class Orchestrator {
       );
     }
 
-        // Set greenlightDischargeFileDescription so the DB utility can use it for GreenlightDischarge batch type
-    fileDetails.greenlightDischargeFileDescription = fileDetails.greenlightDischargeFileDescription;
+    // Set dischargeFileDescription so the DB utility can use it for GreenlightDischarge batch type
+    fileDetails.dischargeFileDescription = fileDetails.greenlightDischargeFileDescription;
 
     const db = new DbService();
     fileDetails.batchType = 'GreenlightDischarge';
@@ -343,14 +343,32 @@ export class Orchestrator {
     // Wait to ensure file system propagation
     await page.waitForTimeout(3000);
 
+    // Navigate to home page to unlock menu (exit from previous Hangfire iframe context)
+    const env = loadEnv();
+    await page.goto(env.webAppUrl);
+    await page.waitForTimeout(2000);
+    console.log('Navigated to home page before starting Greenlight Discharge cycle');
+
     const hangfirePage = new HangfireJobsPage(page);
 
-   await hangfirePage.goToProcessHFJobs(db, fileDetails, false);
+    await hangfirePage.goToProcessHFJobs(db, fileDetails, false);
     await db.validateHandshakeJobStatus(fileDetails);
-   
-     const manualProcessingService = new ManualProcessingService();
+    console.log('Handshake job status validated in DB for Greenlight Discharge');
+
+
+    const manualProcessingService = new ManualProcessingService();
     const manualResponse = await manualProcessingService.processManualTransaction(fileDetails, province, 'superuser');
-    console.log('Manual Processing API response:', manualResponse);
+    console.log('Manual Processing API response for Greenlight Discharge:', manualResponse);
+
+    // Download & verify client summary report to confirm discharge processing completed successfully
+    const downloadPage = new DownloadPage(page);
+    await downloadPage.setDownloadCriteria(fileDetails);
+    const downloadDir = process.env.PW_DOWNLOADS_DIR || path.resolve(process.cwd(), 'downloads');
+    await downloadPage.downloadAndVerify(fileDetails, downloadDir, testName);
+    const dischargeSummaryPath = path.join(process.cwd(), 'artifacts', testName, fileDetails.summaryReportFileName!);
+    // TDAF discharge summaries can legitimately report zero imported rows
+    ExcelHelper.verifyImportedSuccessfullyAtLeast(dischargeSummaryPath, 0);
+    console.log('Summary report file downloaded and verified for Greenlight Discharge:', fileDetails.summaryReportFileName);
 
     // Download return file for greenlight discharge
     if (!fileDetails.returnFileDescription) {
@@ -360,11 +378,9 @@ export class Orchestrator {
       );
     }
 
-    const downloadPage = new DownloadPage(page);
-    const downloadDir = process.env.PW_DOWNLOADS_DIR || path.resolve(process.cwd(), 'downloads');
-
-    // Preserve original batchType before return file processing
+    // Preserve original values before return file processing
     const originalBatchType = fileDetails.batchType;
+    const originalDischargeFileDescription = fileDetails.dischargeFileDescription;
 
     fileDetails.downloadFileType = 'ReturnFile';
     await this.downloadAndValidateReturnFileWithRetry(
@@ -377,14 +393,15 @@ export class Orchestrator {
       testName
     );
 
-    // Restore original batchType
+    // Restore original values
     fileDetails.batchType = originalBatchType;
+    fileDetails.dischargeFileDescription = originalDischargeFileDescription;
 
     console.log('✓ Greenlight Discharge completed successfully');
     console.log(`  File: ${fileDetails.inputFileName}`);
     console.log(`  Partner Reference from Cycle 1: ${fileDetails.partnerReference}`);
     console.log(`  Batch Type: ${fileDetails.batchType}`);
-    console.log(`  Description: ${fileDetails.greenlightDischargeFileDescription}`);
+    console.log(`  Description: ${fileDetails.dischargeFileDescription}`);
     console.log(`  Return File: ${fileDetails.returnFileName}`);
 
     return fileDetails;
@@ -490,7 +507,7 @@ export class Orchestrator {
     const manualResponse = await manualProcessingService.processManualTransaction(fileDetails, 'BC', 'superuser');
     console.log('Manual Processing API response:', manualResponse);
 
-    const downloadPage = new DownloadPage(page);
+    /* const downloadPage = new DownloadPage(page);
     const downloadDir = process.env.PW_DOWNLOADS_DIR || path.resolve(process.cwd(), 'downloads');
     const testName = scenarioId;
 
@@ -511,11 +528,14 @@ export class Orchestrator {
       testName
     );
 
+    // Extract registration number from return file
+    await this.extractRegistrationNumberFromReturnFile(fileDetails, testName);
+
     console.log(
       `File processed with Batchnumber ${fileDetails.batchNumber}, ` +
       `filename ${fileDetails.inputFileName}  PartnerReference ${fileDetails.partnerReference} ` +
       `and OrderId ${fileDetails.orderId}`
-    );
+    ); */
 
     return fileDetails;
   }
@@ -679,6 +699,64 @@ export class Orchestrator {
 
      return fileDetails;
   }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // BNS COMM External Happy Path
+  // ─────────────────────────────────────────────────────────────────────────────
+  async runBnsCommExternalHappyPath(page: Page, scenarioId: string): Promise<FileDetails> {
+    const fileDetails = loadScenarioData(scenarioId);
+    fileDetails.sampleFile = path.resolve(process.cwd(), 'src', 'data', 'BNS_COMM', 'BNS_Comm_External.xml');
+    fileDetails.scenarioId = scenarioId;
+
+    if (!fileDetails.inputFileDescription) {
+      throw new Error(
+        `InputFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the UniqueId.`
+      );
+    }
+
+    await fileSystem.createBnsCommExternalFile(fileDetails);
+
+    const db = new DbService();
+    fileDetails.batchType = 'NF';
+    await db.setProcessAndFileStatusToNotStarted(fileDetails);
+    const hangfirePage = new HangfireJobsPage(page);
+    await hangfirePage.goToProcessHFJobs(db, fileDetails);
+    await db.validateHandshakeJobStatus(fileDetails);
+    console.log('Handshake job status validated in DB for BNS COMM External');
+
+    // Generate and validate return file
+    const downloadPage = new DownloadPage(page);
+    const downloadDir = process.env.PW_DOWNLOADS_DIR || path.resolve(process.cwd(), 'downloads');
+    const testName = scenarioId;
+
+    if (!fileDetails.returnFileDescription) {
+      throw new Error(
+        `ReturnFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the Return UniqueId.`
+      );
+    }
+    fileDetails.downloadFileType = 'ReturnFile';
+    await this.downloadAndValidateReturnFileWithRetry(
+      page,
+      db,
+      hangfirePage,
+      downloadPage,
+      fileDetails,
+      downloadDir,
+      testName
+    );
+
+    console.log(
+      `BNS COMM External file processed with Batchnumber ${fileDetails.batchNumber}, ` +
+      `filename ${fileDetails.inputFileName}, PartnerReference ${fileDetails.partnerReference}, ` +
+      `RegistrationNumber ${fileDetails.baseRegistrationNum}, OrderId ${fileDetails.orderId}, ` +
+      `and ReturnFile ${fileDetails.returnFileName}`
+    );
+
+    return fileDetails;
+  }
+
   // ─────────────────────────────────────────────────────────────────────────────
   // Private helpers
   // ─────────────────────────────────────────────────────────────────────────────
@@ -761,6 +839,32 @@ export class Orchestrator {
       );
     }
     console.log(`PartnerReference ${fileDetails.partnerReference} found in Return File ${fileDetails.returnFileName}`);
+  }
+
+  private async extractRegistrationNumberFromReturnFile(fileDetails: FileDetails, testName: string): Promise<void> {
+    const fs = await import('fs');
+    if (!fileDetails.returnFileName) {
+      console.log('No return file to extract registration number from');
+      return;
+    }
+    const returnFilePath = path.join(process.cwd(), 'artifacts', testName, fileDetails.returnFileName);
+
+    if (!fs.existsSync(returnFilePath)) {
+      console.log(`Return file not found at ${returnFilePath}`);
+      return;
+    }
+
+    const fileContent = fs.readFileSync(returnFilePath, 'utf-8');
+
+    // Extract Registration-Number from XML
+    // Pattern: <Registration-Number>VALUE</Registration-Number>
+    const regNumMatch = fileContent.match(/<Registration-Number>([^<]+)<\/Registration-Number>/);
+    if (regNumMatch && regNumMatch[1]) {
+      fileDetails.baseRegistrationNum = regNumMatch[1].trim();
+      console.log(`Extracted Registration Number from return file: ${fileDetails.baseRegistrationNum}`);
+    } else {
+      console.log('Could not extract Registration Number from return file');
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

@@ -223,21 +223,41 @@ export class DbService {
   }
 
   async validateHandshakeJobStatus(fileDetails: FileDetails): Promise<void> {
-    const batchNumber = this.normalizeBatchNumber(fileDetails.batchNumber);
+    // Check if this is a TDAF Greenlight Discharge (uses ClientReference and RequestTypeId = 15)
+    const isGreenlightDischarge = fileDetails.batchNumber?.startsWith('csrsdis.');
+
     let row = await this.waitFor<any | null>(
       async () => {
         const pool = await this.getPool();
-        const result = await pool
-          .request()
-          .input('client', sql.VarChar(50), fileDetails.client)
-          .input('batchNumber', sql.VarChar(50), batchNumber)
-          .query(
-            'SELECT TOP 1 HTTPStatusCode, ImportOrderStatus, OrderId FROM RegistrationCGeJson ' +
-              'WHERE ClientInfoId = (SELECT Id FROM ClientInfo WHERE CorporationCode = @client) ' +
-              'AND BatchNumber = @batchNumber AND IsCurrentData = 1 AND JSONResponse != ' + "'NULL'" +
-              ' ORDER BY UpdatedDateTime DESC'
-          );
-        return result.recordset[0] ?? null;
+
+        if (isGreenlightDischarge && fileDetails.partnerReference) {
+          // Use special query for Greenlight Discharge with ClientReference and RequestTypeId = 15
+          const result = await pool
+            .request()
+            .input('client', sql.VarChar(50), fileDetails.client)
+            .input('ReferenceNum', sql.VarChar(50), fileDetails.partnerReference)
+            .query(
+              'SELECT TOP 1 HTTPStatusCode, ImportOrderStatus, OrderId FROM RegistrationCGeJson ' +
+                'WHERE ClientInfoId = (SELECT Id FROM ClientInfo WHERE CorporationCode = @client) ' +
+                'AND ClientReference = @ReferenceNum AND RequestTypeId = 15 AND IsCurrentData = 1 AND JSONResponse != ' + "'NULL'" +
+                ' ORDER BY UpdatedDateTime DESC'
+            );
+          return result.recordset[0] ?? null;
+        } else {
+          // Use standard query with BatchNumber
+          const batchNumber = this.normalizeBatchNumber(fileDetails.batchNumber);
+          const result = await pool
+            .request()
+            .input('client', sql.VarChar(50), fileDetails.client)
+            .input('batchNumber', sql.VarChar(50), batchNumber)
+            .query(
+              'SELECT TOP 1 HTTPStatusCode, ImportOrderStatus, OrderId FROM RegistrationCGeJson ' +
+                'WHERE ClientInfoId = (SELECT Id FROM ClientInfo WHERE CorporationCode = @client) ' +
+                'AND BatchNumber = @batchNumber AND IsCurrentData = 1 AND JSONResponse != ' + "'NULL'" +
+                ' ORDER BY UpdatedDateTime DESC'
+            );
+          return result.recordset[0] ?? null;
+        }
       },
       (r) =>
         !!r &&
@@ -246,7 +266,8 @@ export class DbService {
         !!r.OrderId,
       { timeoutMs: 90_000, intervalMs: 2_000 }
     );
-    if (!row) {
+
+    if (!row && !isGreenlightDischarge) {
       const pool = await this.getPool();
       const fallback = await pool
         .request()

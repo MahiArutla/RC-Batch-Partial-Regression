@@ -91,13 +91,20 @@ export class DbService {
         'WHERE ClientFileInfoId IN (' +
         'SELECT Id FROM ClientFileInfo WHERE ClientInfoId = (SELECT Id FROM ClientInfo WHERE CorporationCode = @client) ' +
         'AND Description LIKE @description) AND IsEnabled = 1';
-    }  else if (type === 'COP') {
+    } else if (type === 'COP') {
       description = fileDetails.copFileDescription;
       query =
         'SELECT TOP 1 UniqueId FROM ClientFileScheduleInfo ' +
         'WHERE ClientFileInfoId IN (' +
         'SELECT Id FROM ClientFileInfo WHERE ClientInfoId = (SELECT Id FROM ClientInfo WHERE CorporationCode = @client) ' +
         'AND Description LIKE @description) AND IsEnabled = 1';
+    } else if (type === 'GreenlightDischarge') {
+      description = fileDetails.greenlightDischargeFileDescription;
+      query =
+        'SELECT TOP 1 UniqueId FROM ClientFileScheduleInfo ' +
+        'WHERE ClientFileInfoId IN (' +
+        'SELECT Id FROM ClientFileInfo WHERE ClientInfoId = (SELECT Id FROM ClientInfo WHERE CorporationCode = @client) ' +
+        "AND Description LIKE '%' + @description + '%') AND IsEnabled = 1";
     } else {
       description = fileDetails.inputFileDescription;
       query =
@@ -146,6 +153,20 @@ export class DbService {
       .input('uniqueId', sql.VarChar(50), uniqueId)
       .query(
         'UPDATE ClientFileScheduleProcessStatus SET ProcessStatusId = 0, FileStatusId = 0 ' +
+          'WHERE ClientFileScheduleInfoId IN (SELECT Id FROM ClientFileScheduleInfo WHERE UniqueId = @uniqueId)'
+      );
+  }
+
+  async setFileStatusToFound(fileDetails: FileDetails): Promise<void> {
+    const pool = await this.getPool();
+    if (!fileDetails.uniqueId) {
+      throw new Error('fileDetails.uniqueId is required to set file status.');
+    }
+    await pool
+      .request()
+      .input('uniqueId', sql.VarChar(50), fileDetails.uniqueId)
+      .query(
+        'UPDATE ClientFileScheduleProcessStatus SET ProcessStatusId = 10, FileStatusId = 11 ' +
           'WHERE ClientFileScheduleInfoId IN (SELECT Id FROM ClientFileScheduleInfo WHERE UniqueId = @uniqueId)'
       );
   }
@@ -202,21 +223,41 @@ export class DbService {
   }
 
   async validateHandshakeJobStatus(fileDetails: FileDetails): Promise<void> {
-    const batchNumber = this.normalizeBatchNumber(fileDetails.batchNumber);
+    // Check if this is a TDAF Greenlight Discharge (uses ClientReference and RequestTypeId = 15)
+    const isGreenlightDischarge = fileDetails.batchNumber?.startsWith('csrsdis.');
+
     let row = await this.waitFor<any | null>(
       async () => {
         const pool = await this.getPool();
-        const result = await pool
-          .request()
-          .input('client', sql.VarChar(50), fileDetails.client)
-          .input('batchNumber', sql.VarChar(50), batchNumber)
-          .query(
-            'SELECT TOP 1 HTTPStatusCode, ImportOrderStatus, OrderId FROM RegistrationCGeJson ' +
-              'WHERE ClientInfoId = (SELECT Id FROM ClientInfo WHERE CorporationCode = @client) ' +
-              'AND BatchNumber = @batchNumber AND IsCurrentData = 1 AND JSONResponse != ' + "'NULL'" +
-              ' ORDER BY UpdatedDateTime DESC'
-          );
-        return result.recordset[0] ?? null;
+
+        if (isGreenlightDischarge && fileDetails.partnerReference) {
+          // Use special query for Greenlight Discharge with ClientReference and RequestTypeId = 15
+          const result = await pool
+            .request()
+            .input('client', sql.VarChar(50), fileDetails.client)
+            .input('ReferenceNum', sql.VarChar(50), fileDetails.partnerReference)
+            .query(
+              'SELECT TOP 1 HTTPStatusCode, ImportOrderStatus, OrderId FROM RegistrationCGeJson ' +
+                'WHERE ClientInfoId = (SELECT Id FROM ClientInfo WHERE CorporationCode = @client) ' +
+                'AND ClientReference = @ReferenceNum AND RequestTypeId = 15 AND IsCurrentData = 1 AND JSONResponse != ' + "'NULL'" +
+                ' ORDER BY UpdatedDateTime DESC'
+            );
+          return result.recordset[0] ?? null;
+        } else {
+          // Use standard query with BatchNumber
+          const batchNumber = this.normalizeBatchNumber(fileDetails.batchNumber);
+          const result = await pool
+            .request()
+            .input('client', sql.VarChar(50), fileDetails.client)
+            .input('batchNumber', sql.VarChar(50), batchNumber)
+            .query(
+              'SELECT TOP 1 HTTPStatusCode, ImportOrderStatus, OrderId FROM RegistrationCGeJson ' +
+                'WHERE ClientInfoId = (SELECT Id FROM ClientInfo WHERE CorporationCode = @client) ' +
+                'AND BatchNumber = @batchNumber AND IsCurrentData = 1 AND JSONResponse != ' + "'NULL'" +
+                ' ORDER BY UpdatedDateTime DESC'
+            );
+          return result.recordset[0] ?? null;
+        }
       },
       (r) =>
         !!r &&
@@ -225,7 +266,8 @@ export class DbService {
         !!r.OrderId,
       { timeoutMs: 90_000, intervalMs: 2_000 }
     );
-    if (!row) {
+
+    if (!row && !isGreenlightDischarge) {
       const pool = await this.getPool();
       const fallback = await pool
         .request()
@@ -292,13 +334,13 @@ export class DbService {
     const status = await this.waitFor<ProcessStatusFileStatusResponse>(
       () => this.getProcessAndFileStatus(fileDetails.uniqueId!),
       (s) => s.processStatusId === 10 && s.fileStatusId === 11,
-      { timeoutMs: 60_000, intervalMs: 2_000 }
+      { timeoutMs: 120_000, intervalMs: 3_000 }
     );
     if (status.processStatusId !== 10) {
-      throw new Error(`Process Status is not updated as Ready: ${status.processStatusId}`);
+      throw new Error(`Process Status is not updated as Ready: ${status.processStatusId}. Expected 10 (Ready). File may not have been picked up by ClientFileScheduler.`);
     }
     if (status.fileStatusId !== 11) {
-      throw new Error(`File Status is not updated as Found: ${status.fileStatusId}`);
+      throw new Error(`File Status is not updated as Found: ${status.fileStatusId}. Expected 11 (Found). File may not exist in SFTP or ClientFileScheduler hasn't run yet.`);
     }
   }
 

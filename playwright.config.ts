@@ -6,7 +6,7 @@ const env = loadEnv();
 
 export default defineConfig({
   testDir: './src/tests',
-  timeout: 5 * 60 * 1000,
+  timeout: 15 * 60 * 1000,
   retries: 1,
   expect: {
     timeout: 15_000

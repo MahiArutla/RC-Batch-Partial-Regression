@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Xif-Document Version="1.0" Database="ONCNS9" Direction="Import">
+	<Registration-List>
+	
+				<Registration Type="External">
+			<PPR Province="BC">
+				<Registration-Date Format="yyyy-MM-dd HH:mm:ss">2024-06-07 00:00:00</Registration-Date>
+				<Registration-Number>220607A</Registration-Number>
+				<Expiry-Date Format="yyyy-MM-dd HH:mm:ss">2026-10-29 00:00:00</Expiry-Date>
+				<ON.File-Reference-Number>777782735</ON.File-Reference-Number>
+			</PPR>
+			<Partner-Reference>BNS_COMM_RefNum</Partner-Reference>
+			<Contract>
+				<Date Format="yyyy-MM-dd HH:mm:ss">2024-06-07 00:00:00</Date>
+				<Term Unit="Year">5</Term>
+				<Shared-Income>NO</Shared-Income>
+				<Amount>0</Amount>
+			</Contract>
+			<PPR-Registration-Number>220607A</PPR-Registration-Number>
+			<Party-List>
+				<Party Type="Secured-Business">
+					<Address>
+						<Street>4715 Tahoe Blvd</Street>
+						<City>Mississauga</City>
+						<Postal-Code>L4W0B4</Postal-Code>
+						<Province>ON</Province>
+					</Address>
+					<Name>The Bank of Nova Scotia</Name>
+				</Party>
+				<Party Type="Billing">
+					<Bank-Account Owner-Type="Branch"/>
+					<Transit>33993</Transit>
+				</Party>
+				<Party Type="Requesting">
+					<Transit>50336</Transit>
+				</Party>
+				<Party Type="Debtor-Business">
+					<Address>
+						<Street>450 Broadway</Street>
+						<City>Winnipeg</City>
+						<Postal-Code>R3C0V8</Postal-Code>
+						<Province>MB</Province>
+					</Address>
+					<Post-Search>
+						<Fax-Number>0000047696</Fax-Number>
+					</Post-Search>
+					<Name>SBLP LANCASTER MALL INC.</Name>
+				</Party>
+				<Party Type="Debtor-Individual">
+					<Address>
+						<Street>908 Broadway</Street>
+						<City>Winnipeg</City>
+						<Postal-Code>R3C0V1</Postal-Code>
+						<Province>MB</Province>
+					</Address>
+					<Post-Search>
+						<Fax-Number>0000001677</Fax-Number>
+					</Post-Search>
+					<First-Name>TestFN</First-Name>
+					<Middle-Name></Middle-Name>
+					<Last-Name>TestLN</Last-Name>
+					<Birth-Date Format="yyyy-MM-dd HH:mm:ss">1989-10-10 00:00:00</Birth-Date>
+				</Party>
+			</Party-List>
+			<Collaterals>
+				<Collateral Type="General">
+					<Description>Shares in the capital stock of HELICO SERVICE INC.</Description>
+				</Collateral>
+				</Collaterals>
+		</Registration>
+		
+	</Registration-List>
+	<Batch Number="20240607104">
+		<Date Format="yyyy-MM-dd HH:mm:ss">2024-06-07 10:23:27</Date>
+	</Batch>
+</Xif-Document>

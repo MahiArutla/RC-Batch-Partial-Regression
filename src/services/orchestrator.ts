@@ -484,61 +484,8 @@ export class Orchestrator {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // BNS Commercial Happy Path NF
+  // BNS Commercial Happy Path Discharge
   // ─────────────────────────────────────────────────────────────────────────────
-  async runBnsCommHappyPathNF(page: Page, scenarioId: string): Promise<FileDetails> {
-    const fileDetails = loadScenarioData(scenarioId);
-    fileDetails.sampleFile = path.resolve(process.cwd(), 'src', 'data', 'BNS_COMM', 'BNS_Comm_NF.xml');
-    fileDetails.scenarioId = scenarioId;
-
-    if (!fileDetails.inputFileDescription) {
-      throw new Error(`InputFileDescription is missing in TestData.xlsx for scenario ${scenarioId}.`);
-    }
-
-    await fileSystem.createBnsCommNfXml(fileDetails);
-
-    const db = new DbService();
-    fileDetails.batchType = 'NF';
-    await db.setProcessAndFileStatusToNotStarted(fileDetails);
-    const hangfirePage = new HangfireJobsPage(page);
-    await hangfirePage.goToHFJobs(db, fileDetails);
-
-    const manualProcessingService = new ManualProcessingService();
-    const manualResponse = await manualProcessingService.processManualTransaction(fileDetails, 'BC', 'superuser');
-    console.log('Manual Processing API response:', manualResponse);
-
-    /* const downloadPage = new DownloadPage(page);
-    const downloadDir = process.env.PW_DOWNLOADS_DIR || path.resolve(process.cwd(), 'downloads');
-    const testName = scenarioId;
-
-    if (!fileDetails.returnFileDescription) {
-      throw new Error(
-        `ReturnFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
-        `Please add it so DB can resolve the Return UniqueId.`
-      );
-    }
-    fileDetails.downloadFileType = 'ReturnFile';
-    await this.downloadAndValidateReturnFileWithRetry(
-      page,
-      db,
-      hangfirePage,
-      downloadPage,
-      fileDetails,
-      downloadDir,
-      testName
-    );
-
-    // Extract registration number from return file
-    await this.extractRegistrationNumberFromReturnFile(fileDetails, testName);
-
-    console.log(
-      `File processed with Batchnumber ${fileDetails.batchNumber}, ` +
-      `filename ${fileDetails.inputFileName}  PartnerReference ${fileDetails.partnerReference} ` +
-      `and OrderId ${fileDetails.orderId}`
-    ); */
-
-    return fileDetails;
-  }
   async runBnsCommHappyPathDischarge(
     page: Page,
     scenarioId: string,
@@ -614,58 +561,6 @@ export class Orchestrator {
     await hangfirePage.goToProcessHFJobs(db, fileDetails);
     await db.validateHandshakeJobStatus(fileDetails);
     console.log('Handshake job status validated in DB');
-    const manualProcessingService = new ManualProcessingService();
-    const manualResponse = await manualProcessingService.processManualTransaction(fileDetails, 'BC', 'superuser');
-    console.log('Manual Processing API response:', manualResponse);
-
-    const downloadPage = new DownloadPage(page);
-    const downloadDir = process.env.PW_DOWNLOADS_DIR || path.resolve(process.cwd(), 'downloads');
-    const testName = scenarioId;
-
-    if (!fileDetails.returnFileDescription) {
-      throw new Error(
-        `ReturnFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
-        `Please add it so DB can resolve the Return UniqueId.`
-      );
-    }
-    fileDetails.downloadFileType = 'ReturnFile';
-    await this.downloadAndValidateReturnFileWithRetry(
-      page,
-      db,
-      hangfirePage,
-      downloadPage,
-      fileDetails,
-      downloadDir,
-      testName
-    );
-
-    console.log(
-      `File processed with Batchnumber ${fileDetails.batchNumber}, ` +
-      `filename ${fileDetails.inputFileName}  PartnerReference ${fileDetails.partnerReference} ` +
-      `and OrderId ${fileDetails.orderId}`
-    );
-
-     return fileDetails;
-  }
-  async runBnsCommHappyPathAmendment(
-    page: Page,
-    scenarioId: string,
-    registrationNumber: string,
-    partnerReference: string
-  ): Promise<FileDetails> {
-    const fileDetails = loadScenarioData(scenarioId);
-    fileDetails.sampleFile = path.resolve(process.cwd(), 'src', 'data', 'BNS_COMM', 'BNS_Comm_Amendment.xml');
-    fileDetails.scenarioId = scenarioId;
-    fileDetails.partnerReference = partnerReference;
-    fileDetails.baseRegistrationNum = registrationNumber;
-
-    await fileSystem.createBnsCommDischargeXml(fileDetails);
-
-    const db = new DbService();
-    fileDetails.batchType = 'NF';
-    await db.setProcessAndFileStatusToNotStarted(fileDetails);
-    const hangfirePage = new HangfireJobsPage(page);
-    await hangfirePage.goToProcessHFJobs(db, fileDetails);
     const manualProcessingService = new ManualProcessingService();
     const manualResponse = await manualProcessingService.processManualTransaction(fileDetails, 'BC', 'superuser');
     console.log('Manual Processing API response:', manualResponse);

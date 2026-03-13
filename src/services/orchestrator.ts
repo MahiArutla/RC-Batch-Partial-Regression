@@ -653,6 +653,74 @@ export class Orchestrator {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
+  // BNS COMM Search Happy Path
+  // ─────────────────────────────────────────────────────────────────────────────
+  async runBnsCommSearchHappyPath(page: Page, scenarioId: string): Promise<FileDetails> {
+    const fileDetails = loadScenarioData(scenarioId);
+    fileDetails.sampleFile = path.resolve(process.cwd(), 'src', 'data', 'BNS_COMM', 'BNS_Comm_Search.xml');
+    fileDetails.scenarioId = scenarioId;
+
+    if (!fileDetails.inputFileDescription) {
+      throw new Error(
+        `InputFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the UniqueId.`
+      );
+    }
+
+    await fileSystem.createBnsCommSearchFile(fileDetails);
+
+    const db = new DbService();
+    fileDetails.batchType = 'NF';
+    await db.setProcessAndFileStatusToNotStarted(fileDetails);
+    const hangfirePage = new HangfireJobsPage(page);
+    await hangfirePage.goToProcessHFJobs(db, fileDetails);
+    await db.validateHandshakeJobStatus(fileDetails);
+    console.log('Handshake job status validated in DB for BNS COMM Search');
+
+    console.log(
+      `BNS COMM Search file processed with Batchnumber ${fileDetails.batchNumber}, ` +
+      `filename ${fileDetails.inputFileName}, PartnerReference ${fileDetails.partnerReference}, ` +
+      `OrderId ${fileDetails.orderId}`
+    );
+
+    return fileDetails;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // BNS COMM Lookup Happy Path
+  // ─────────────────────────────────────────────────────────────────────────────
+  async runBnsCommLookupHappyPath(page: Page, scenarioId: string): Promise<FileDetails> {
+    const fileDetails = loadScenarioData(scenarioId);
+    fileDetails.sampleFile = path.resolve(process.cwd(), 'src', 'data', 'BNS_COMM', 'BNS_Comm_Lookup.xml');
+    fileDetails.scenarioId = scenarioId;
+
+    if (!fileDetails.inputFileDescription) {
+      throw new Error(
+        `InputFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the UniqueId.`
+      );
+    }
+
+    await fileSystem.createBnsCommLookupFile(fileDetails);
+
+    const db = new DbService();
+    fileDetails.batchType = 'NF';
+    await db.setProcessAndFileStatusToNotStarted(fileDetails);
+    const hangfirePage = new HangfireJobsPage(page);
+    await hangfirePage.goToProcessHFJobs(db, fileDetails);
+    await db.validateHandshakeJobStatus(fileDetails, true);
+    console.log('Handshake job status validated in DB for BNS COMM Lookup');
+
+    console.log(
+      `BNS COMM Lookup file processed with Batchnumber ${fileDetails.batchNumber}, ` +
+      `filename ${fileDetails.inputFileName}, RegistrationNumber ${fileDetails.baseRegistrationNum}, ` +
+      `OrderId ${fileDetails.orderId}`
+    );
+
+    return fileDetails;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
   // Private helpers
   // ─────────────────────────────────────────────────────────────────────────────
   private async downloadAndValidateReturnFileWithRetry(

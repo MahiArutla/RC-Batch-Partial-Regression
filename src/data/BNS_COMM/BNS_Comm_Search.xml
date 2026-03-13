@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Xif-Document Version="1.0" Database="ONCNS9" Direction="Import">
+		<Search-List>
+		<Search Type="PPSA">
+			<PPR Province="BC"/>
+			<Partner-Reference>SearchTesting2</Partner-Reference>
+			<Contract>
+				<Shared-Income>No</Shared-Income>
+			</Contract>
+			<Return-Method>
+				<Email>aishwarya.pradhan@trader.ca</Email>
+			</Return-Method>
+			<Party-List>
+				<Party Type="Ordering">
+					<Client-Id>25996</Client-Id>
+					<Contact-Name>Charles Gomes</Contact-Name>
+				</Party>
+				<Party Type="Billing">
+					<Bank-Account Owner-Type="Customer">
+						<Bank-Number>0002</Bank-Number>
+						<Transit-Number>99844</Transit-Number>
+						<Account-Number>030201037315</Account-Number>
+					</Bank-Account>
+					<Transit>03020</Transit>
+				</Party>
+			</Party-List>
+			<Criterion-List>
+				<Debtor Type="Business">
+					<Name>MAINROAD PROPERTIES (LANGFORD) LIMITED PARTNERSHIP</Name>
+				</Debtor>
+		<Debtor Type="Individual">
+					<First-Name>Advait</First-Name>
+					<Middle-Name>Aditya</Middle-Name>
+					<Last-Name>Sahasrabuddhe</Last-Name>
+					<Birth-Date Format="yyyy-MM-dd HH:mm:ss">2020-10-16 00:00:00</Birth-Date>
+				</Debtor>
+			</Criterion-List>
+		</Search>
+	</Search-List>
+	<Batch Number="20250922">
+		<Date Format="yyyy-MM-dd HH:mm:ss">2018-11-04 13:24:27</Date>
+	</Batch>
+</Xif-Document>

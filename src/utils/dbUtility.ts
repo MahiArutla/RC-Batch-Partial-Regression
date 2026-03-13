@@ -222,9 +222,13 @@ export class DbService {
     }
   }
 
-  async validateHandshakeJobStatus(fileDetails: FileDetails): Promise<void> {
+  async validateHandshakeJobStatus(fileDetails: FileDetails, isLookup: boolean = false): Promise<void> {
     // Check if this is a TDAF Greenlight Discharge (uses ClientReference and RequestTypeId = 15)
     const isGreenlightDischarge = fileDetails.batchNumber?.startsWith('csrsdis.');
+
+    // Set expected status codes based on test type
+    const expectedHTTPStatusCode = isLookup ? 'OK' : 'Created';
+    const expectedImportOrderStatuses = isLookup ? ['Success'] : ['Submitted', 'Imported'];
 
     let row = await this.waitFor<any | null>(
       async () => {
@@ -261,13 +265,13 @@ export class DbService {
       },
       (r) =>
         !!r &&
-        r.HTTPStatusCode === 'Created' &&
-        (r.ImportOrderStatus === 'Submitted' || r.ImportOrderStatus === 'Imported') &&
-        !!r.OrderId,
+        r.HTTPStatusCode === expectedHTTPStatusCode &&
+        expectedImportOrderStatuses.includes(r.ImportOrderStatus) &&
+        (isLookup || !!r.OrderId),
       { timeoutMs: 90_000, intervalMs: 2_000 }
     );
 
-    if (!row && !isGreenlightDischarge) {
+    if (!row && !isGreenlightDischarge && !isLookup) {
       const pool = await this.getPool();
       const fallback = await pool
         .request()
@@ -285,16 +289,28 @@ export class DbService {
     if (!row) {
       throw new Error('RegistrationCGeJson row not found for handshake validation.');
     }
-    if (row.HTTPStatusCode !== 'Created' || (row.ImportOrderStatus !== 'Submitted' && row.ImportOrderStatus !== 'Imported')) {
+    if (row.HTTPStatusCode !== expectedHTTPStatusCode || !expectedImportOrderStatuses.includes(row.ImportOrderStatus)) {
       throw new Error(
         `Handshake validation failed. HTTPStatusCode=${row.HTTPStatusCode}, ImportOrderStatus=${row.ImportOrderStatus}`
       );
     }
-    if (!row.OrderId) {
-      throw new Error('OrderId is missing from handshake response.');
+
+    // OrderId is optional for Lookup tests
+    if (!isLookup) {
+      if (!row.OrderId) {
+        throw new Error('OrderId is missing from handshake response.');
+      }
+      fileDetails.orderId = row.OrderId.toString();
+      console.log(`Handshake validated with HTTPStatusCode = ${row.HTTPStatusCode} , ImportOrderStatus = ${row.ImportOrderStatus} & OrderId: ${fileDetails.orderId}`);
+    } else {
+      // For Lookup, OrderId may be null
+      if (row.OrderId) {
+        fileDetails.orderId = row.OrderId.toString();
+        console.log(`Handshake validated with HTTPStatusCode = ${row.HTTPStatusCode} , ImportOrderStatus = ${row.ImportOrderStatus} & OrderId: ${fileDetails.orderId}`);
+      } else {
+        console.log(`Handshake validated with HTTPStatusCode = ${row.HTTPStatusCode} , ImportOrderStatus = ${row.ImportOrderStatus} (OrderId is null for Lookup)`);
+      }
     }
-    fileDetails.orderId = row.OrderId.toString();
-    console.log(`Handshake validated with HTTPStatusCode = ${row.HTTPStatusCode} , ImportOrderStatus = ${row.ImportOrderStatus} & OrderId: ${fileDetails.orderId}`);
   }
 
   async setProcessAndFileStatusToNotStartedReturn(fileDetails: FileDetails): Promise<void> {

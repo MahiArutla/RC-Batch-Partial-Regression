@@ -6,7 +6,8 @@
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",
-    "codegen": "playwright codegen"
+    "codegen": "playwright codegen",
+    "postinstall": "git config core.hooksPath .githooks && chmod +x .githooks/post-checkout .githooks/post-merge 2>/dev/null || true"
   },
   "dependencies": {
     "@types/node-fetch": "^2.6.13",

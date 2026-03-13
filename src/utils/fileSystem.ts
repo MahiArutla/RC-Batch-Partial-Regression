@@ -195,10 +195,6 @@ function generateId(prefix: string): string {
   return `${prefix}${date} ${time}`;
 }
 
-// Usage
-const value = generateId("LON-TDAF");
-console.log(value);
-
 export async function updateRenewalFile(filePath: string, fileDetails: FileDetails): Promise<void> {
   const content = await fs.readFile(filePath, 'utf-8');
   const lines = content.split(/\r?\n/);
@@ -884,6 +880,94 @@ export async function createBnsCommExternalFile(fileDetails: FileDetails): Promi
   await copyFile(fileDetails.sampleFile, sourceFilePath);
 
   await updateBnsCommExternalFile(sourceFilePath, fileDetails);
+
+  const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', inputFileName);
+  const targetDir = path.dirname(targetPath);
+  await ensureDirectory(targetDir);
+  await clearDirectory(targetDir);
+  await copyFile(sourceFilePath, targetPath);
+  fileDetails.inputFileName = inputFileName;
+}
+
+function buildBnsCommSearchFileName(): string {
+  return `xifdoc${formatAdjustedTimestamp()}.XML`;
+}
+
+async function updateBnsCommSearchFile(filePath: string, fileDetails: FileDetails): Promise<void> {
+  let content = await fs.readFile(filePath, 'utf-8');
+
+  // Generate new partner reference
+  const partnerRef = fileDetails.partnerReference || generateBmoInputFileName();
+  fileDetails.partnerReference = partnerRef;
+  console.log(`Generated Partner Reference: ${partnerRef}`);
+
+  const batchNumber = generateBatchNumber();
+  fileDetails.batchNumber = batchNumber;
+
+  // Update Partner-Reference
+  content = content.replace(/<Partner-Reference>[^<]*<\/Partner-Reference>/g, `<Partner-Reference>${partnerRef}</Partner-Reference>`);
+
+  // Update Batch Number
+  content = content.replace(/<Batch Number="[^"]*">/g, `<Batch Number="${batchNumber}">`);
+
+  console.log(`✓ Updated Partner-Reference to: ${partnerRef}`);
+  console.log(`✓ Updated Batch Number to: ${batchNumber}`);
+
+  await fs.writeFile(filePath, content, 'utf-8');
+}
+
+export async function createBnsCommSearchFile(fileDetails: FileDetails): Promise<void> {
+  const scenarioArtifactsDir = path.join(process.cwd(), 'artifacts', fileDetails.scenarioId);
+  await ensureDirectory(scenarioArtifactsDir);
+
+  const inputFileName = buildBnsCommSearchFileName();
+  const sourceFilePath = path.join(scenarioArtifactsDir, inputFileName);
+  await copyFile(fileDetails.sampleFile, sourceFilePath);
+
+  await updateBnsCommSearchFile(sourceFilePath, fileDetails);
+
+  const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', inputFileName);
+  const targetDir = path.dirname(targetPath);
+  await ensureDirectory(targetDir);
+  await clearDirectory(targetDir);
+  await copyFile(sourceFilePath, targetPath);
+  fileDetails.inputFileName = inputFileName;
+}
+
+function buildBnsCommLookupFileName(): string {
+  return `xifdoc${formatAdjustedTimestamp()}.XML`;
+}
+
+async function updateBnsCommLookupFile(filePath: string, fileDetails: FileDetails): Promise<void> {
+  let content = await fs.readFile(filePath, 'utf-8');
+
+  const batchNumber = generateBatchNumber();
+  fileDetails.batchNumber = batchNumber;
+
+  // Extract existing registration number from the file for reference
+  const regNumMatch = content.match(/<PPR-Registration-Number>([^<]*)<\/PPR-Registration-Number>/);
+  if (regNumMatch && regNumMatch[1]) {
+    fileDetails.baseRegistrationNum = regNumMatch[1].trim();
+    console.log(`Using existing Registration Number: ${fileDetails.baseRegistrationNum}`);
+  }
+
+  // Update Batch Number only
+  content = content.replace(/<Batch Number="[^"]*">/g, `<Batch Number="${batchNumber}">`);
+
+  console.log(`✓ Updated Batch Number to: ${batchNumber}`);
+
+  await fs.writeFile(filePath, content, 'utf-8');
+}
+
+export async function createBnsCommLookupFile(fileDetails: FileDetails): Promise<void> {
+  const scenarioArtifactsDir = path.join(process.cwd(), 'artifacts', fileDetails.scenarioId);
+  await ensureDirectory(scenarioArtifactsDir);
+
+  const inputFileName = buildBnsCommLookupFileName();
+  const sourceFilePath = path.join(scenarioArtifactsDir, inputFileName);
+  await copyFile(fileDetails.sampleFile, sourceFilePath);
+
+  await updateBnsCommLookupFile(sourceFilePath, fileDetails);
 
   const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', inputFileName);
   const targetDir = path.dirname(targetPath);

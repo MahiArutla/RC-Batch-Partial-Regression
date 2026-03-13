@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Xif-Document Version="1.0" Database="ONCNS9" Direction="Import">
+	<Registration-List>
+		<Registration Type="Look-Up">
+			<PPR Province="BC"/>
+			<Contract/>
+			<PPR-Registration-Number>544510A</PPR-Registration-Number>
+		</Registration>
+		</Registration-List>
+	<Batch Number="20240607107">
+		<Date Format="yyyy-MM-dd HH:mm:ss">2024-06-07 13:00:35</Date>
+	</Batch>
+</Xif-Document> 

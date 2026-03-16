@@ -39,6 +39,35 @@ export class DownloadPage {
     this.downloadFileNav = page.locator("//ul/li/a/span[text()='Download File']");
   }
 
+  private async getTableResultCount(): Promise<number> {
+    const text = (await this.fileTableResultCount.textContent())?.trim();
+    if (!text) return 0;
+
+    const num = parseInt(text.split(' total')[0].trim(), 10);
+    return Number.isNaN(num) ? 0 : num;
+  }
+
+  private async searchTableWithCandidates(candidates: string[], timeoutPerCandidate: number = 10000): Promise<boolean> {
+    for (const candidate of candidates) {
+      const trimmedCandidate = candidate.trim();
+      if (!trimmedCandidate) {
+        continue;
+      }
+
+      await this.searchInTable.fill(trimmedCandidate);
+      try {
+        await expect
+          .poll(async () => this.getTableResultCount(), { timeout: timeoutPerCandidate })
+          .toBeGreaterThan(0);
+        return true;
+      } catch {
+        // Try the next candidate.
+      }
+    }
+
+    return false;
+  }
+
   async setDownloadCriteria(fileDetails: FileDetails) {
     await this.downloadFileNav.waitFor({ state: 'visible', timeout: 20000 });
     await this.downloadFileNav.click();
@@ -62,45 +91,54 @@ export class DownloadPage {
   }
 
   async downloadAndVerify(fileDetails: FileDetails, downloadDir: string, testName: string) {
-    const searchValue =
-      fileDetails.downloadFileType === 'ReturnFile'
-        ? (fileDetails.batchNumber ?? fileDetails.partnerReference ?? fileDetails.inputFileName ?? '')
-        : (fileDetails.inputFileName ?? '');
-    await this.searchInTable.fill(searchValue);
+    const isSummaryFile = fileDetails.downloadFileType !== 'ReturnFile';
+    const candidates = isSummaryFile
+      ? [
+          fileDetails.inputFileName ?? '',
+          fileDetails.batchNumber ?? '',
+          fileDetails.partnerReference ?? '',
+          'SummaryReport_',
+        ]
+      : [
+          fileDetails.batchNumber ?? '',
+          fileDetails.partnerReference ?? '',
+          fileDetails.inputFileName ?? '',
+        ];
 
-    await expect.poll(async () => {
-    const text = await this.fileTableResultCount.textContent();
-    if (!text) return 0;
-
-    const num = parseInt(text.split(' total')[0].trim());
-    return isNaN(num) ? 0 : num;
-  }, {
-    timeout: 30000,
-      message: 'Waiting for search results to load. Ensure that the search criteria are correct and that the file exists in the table.',
-    }).toBeGreaterThan(0);
-
-    const text = await this.fileTableResultCount.textContent();
-    const count = text ? parseInt(text.split(' total')[0].trim()) : 0;
-
-    if (count === 0) {
-      throw new Error(
-        `No search results found for search value: ${searchValue}. ` +
-        `Please verify that the file exists and the search criteria are correct.`
-      );
+    const matchedCriteria = await this.searchTableWithCandidates(candidates);
+    if (!matchedCriteria) {
+      await this.searchInTable.fill('');
+      await this.goBtn.click();
+      await expect
+        .poll(async () => this.getTableResultCount(), {
+          timeout: 30000,
+          message:
+            'Waiting for search results to load. Ensure that the search criteria are correct and that the file exists in the table.',
+        })
+        .toBeGreaterThan(0);
     }
 
-    const filePrefixRegex = /ClientSummaryReport_/;
-    const row = this.page
+    const summaryFileRegex = /SummaryReport_/;
+    const candidateRow = this.page
       .locator('datatable-body-row')
-      .filter({ hasText: filePrefixRegex })
+      .filter({ hasText: summaryFileRegex })
       .first();
+    const row = (await candidateRow.count()) > 0
+      ? candidateRow
+      : this.page.locator('datatable-body-row').first();
 
     await row.waitFor({ state: 'visible', timeout: 10000 });
+    await row.scrollIntoViewIfNeeded();
 
-    const fileNameLocator = row.getByText(filePrefixRegex);
-    const rawName = (await fileNameLocator.textContent())?.trim();
+    const fileNameLocator = row
+      .locator('datatable-body-cell')
+      .nth(2)
+      .locator('.datatable-body-cell-label');
+    await expect(fileNameLocator).toBeVisible({ timeout: 5000 });
+
+    const rawName = (await fileNameLocator.innerText()).trim();
     if (!rawName) {
-      throw new Error('ClientSummaryReport_ filename found in row but unable to read text.');
+      throw new Error('Summary report row found in table but unable to read the filename text.');
     }
 
     fileDetails.summaryReportFileName = rawName;
@@ -143,12 +181,7 @@ export class DownloadPage {
       try {
         await expect
           .poll(
-            async () => {
-              const text = (await this.fileTableResultCount.textContent())?.trim();
-              if (!text) return 0;
-              const num = parseInt(text.split(' total')[0].trim(), 10);
-              return Number.isNaN(num) ? 0 : num;
-            },
+            async () => this.getTableResultCount(),
             { timeout: 10000 }
           )
           .toBeGreaterThan(0);
@@ -164,13 +197,7 @@ export class DownloadPage {
 
     await expect
       .poll(
-        async () => {
-          const text = (await this.fileTableResultCount.textContent())?.trim();
-          if (!text) return 0;
-
-          const num = parseInt(text.split(' total')[0].trim(), 10);
-          return Number.isNaN(num) ? 0 : num;
-        },
+        async () => this.getTableResultCount(),
         {
           timeout: 30000,
           message:

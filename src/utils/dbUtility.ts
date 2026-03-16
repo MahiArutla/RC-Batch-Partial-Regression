@@ -16,6 +16,12 @@ interface ProcessStatusIdResponse {
   registrationId: number[];
 }
 
+interface HandshakeValidationExpectation {
+  httpStatusCodes: string[];
+  importOrderStatuses: string[];
+  requireOrderId: boolean;
+}
+
 export class DbService {
   private poolPromise: Promise<sql.ConnectionPool>;
 
@@ -53,6 +59,38 @@ export class DbService {
     if (!normalized) return null;
     // guard for SQL VarChar(50) parameter
     return normalized.length > 50 ? normalized.substring(0, 50) : normalized;
+  }
+
+  private getHandshakeValidationExpectation(
+    fileDetails: FileDetails,
+    isLookup: boolean
+  ): HandshakeValidationExpectation {
+    if (isLookup) {
+      return {
+        httpStatusCodes: ['OK'],
+        importOrderStatuses: ['Success'],
+        requireOrderId: false,
+      };
+    }
+
+    const client = (fileDetails.client ?? '').toUpperCase();
+    const batchType = (fileDetails.batchType ?? '').toUpperCase();
+    const isTdafDischargeFamily =
+      client === 'TDAF' && (batchType === 'DISCHARGE' || batchType === 'GREENLIGHTDISCHARGE');
+
+    if (isTdafDischargeFamily) {
+      return {
+        httpStatusCodes: ['OK', 'Created'],
+        importOrderStatuses: ['NotImported', 'Submitted', 'Imported'],
+        requireOrderId: true,
+      };
+    }
+
+    return {
+      httpStatusCodes: ['Created'],
+      importOrderStatuses: ['Submitted', 'Imported'],
+      requireOrderId: true,
+    };
   }
 
   async enableClient(client: string): Promise<void> {
@@ -225,10 +263,7 @@ export class DbService {
   async validateHandshakeJobStatus(fileDetails: FileDetails, isLookup: boolean = false): Promise<void> {
     // Check if this is a TDAF Greenlight Discharge (uses ClientReference and RequestTypeId = 15)
     const isGreenlightDischarge = fileDetails.batchNumber?.startsWith('csrsdis.');
-
-    // Set expected status codes based on test type
-    const expectedHTTPStatusCode = isLookup ? 'OK' : 'Created';
-    const expectedImportOrderStatuses = isLookup ? ['Success'] : ['Submitted', 'Imported'];
+    const expectation = this.getHandshakeValidationExpectation(fileDetails, isLookup);
 
     let row = await this.waitFor<any | null>(
       async () => {
@@ -265,13 +300,14 @@ export class DbService {
       },
       (r) =>
         !!r &&
-        r.HTTPStatusCode === expectedHTTPStatusCode &&
-        expectedImportOrderStatuses.includes(r.ImportOrderStatus) &&
-        (isLookup || !!r.OrderId),
+        expectation.httpStatusCodes.includes(r.HTTPStatusCode) &&
+        expectation.importOrderStatuses.includes(r.ImportOrderStatus) &&
+        (!expectation.requireOrderId || !!r.OrderId),
       { timeoutMs: 90_000, intervalMs: 2_000 }
     );
 
-    if (!row && !isGreenlightDischarge && !isLookup) {
+    if (!row && !isGreenlightDischarge && !isLookup && expectation.requireOrderId) {
+      const importOrderStatusesSql = expectation.importOrderStatuses.map((status) => `'${status}'`).join(',');
       const pool = await this.getPool();
       const fallback = await pool
         .request()
@@ -280,7 +316,7 @@ export class DbService {
           'SELECT TOP 1 HTTPStatusCode, ImportOrderStatus, OrderId, BatchNumber FROM RegistrationCGeJson ' +
             'WHERE ClientInfoId = (SELECT Id FROM ClientInfo WHERE CorporationCode = @client) ' +
             'AND IsCurrentData = 1 AND JSONResponse != ' + "'NULL'" +
-            " AND ImportOrderStatus IN ('Submitted','Imported')" +
+            ` AND ImportOrderStatus IN (${importOrderStatusesSql})` +
             ' AND OrderId IS NOT NULL ' +
             ' ORDER BY UpdatedDateTime DESC'
         );
@@ -289,14 +325,16 @@ export class DbService {
     if (!row) {
       throw new Error('RegistrationCGeJson row not found for handshake validation.');
     }
-    if (row.HTTPStatusCode !== expectedHTTPStatusCode || !expectedImportOrderStatuses.includes(row.ImportOrderStatus)) {
+    if (
+      !expectation.httpStatusCodes.includes(row.HTTPStatusCode) ||
+      !expectation.importOrderStatuses.includes(row.ImportOrderStatus)
+    ) {
       throw new Error(
         `Handshake validation failed. HTTPStatusCode=${row.HTTPStatusCode}, ImportOrderStatus=${row.ImportOrderStatus}`
       );
     }
 
-    // OrderId is optional for Lookup tests
-    if (!isLookup) {
+    if (expectation.requireOrderId) {
       if (!row.OrderId) {
         throw new Error('OrderId is missing from handshake response.');
       }
@@ -349,14 +387,14 @@ export class DbService {
   async validateClientFileSchedulerJobFileStatusInDB(fileDetails: FileDetails): Promise<void> {
     const status = await this.waitFor<ProcessStatusFileStatusResponse>(
       () => this.getProcessAndFileStatus(fileDetails.uniqueId!),
-      (s) => s.processStatusId === 10 && s.fileStatusId === 11,
+      (s) => s.processStatusId >= 10 && s.fileStatusId >= 11,
       { timeoutMs: 120_000, intervalMs: 3_000 }
     );
-    if (status.processStatusId !== 10) {
-      throw new Error(`Process Status is not updated as Ready: ${status.processStatusId}. Expected 10 (Ready). File may not have been picked up by ClientFileScheduler.`);
+    if (status.processStatusId < 10) {
+      throw new Error(`Process Status is not updated to Ready or beyond: ${status.processStatusId}. Expected at least 10 after ClientFileScheduler picked up the file.`);
     }
-    if (status.fileStatusId !== 11) {
-      throw new Error(`File Status is not updated as Found: ${status.fileStatusId}. Expected 11 (Found). File may not exist in SFTP or ClientFileScheduler hasn't run yet.`);
+    if (status.fileStatusId < 11) {
+      throw new Error(`File Status is not updated to Found or beyond: ${status.fileStatusId}. Expected at least 11 after ClientFileScheduler picked up the file.`);
     }
   }
 

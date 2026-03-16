@@ -260,7 +260,6 @@ export class Orchestrator {
     fileDetails.partnerReference = partnerReference;
 
     await fileSystem.createChangeOfProvinceFile(fileDetails);
-    await page.waitForTimeout(2000);
 
     if (!fileDetails.inputFileDescription) {
       throw new Error(
@@ -273,7 +272,7 @@ export class Orchestrator {
     fileDetails.batchType = 'COP';
     await db.setProcessAndFileStatusToNotStarted(fileDetails);
     const hangfirePage = new HangfireJobsPage(page);
-    await hangfirePage.goToProcessHFJobs(db, fileDetails, false);
+    await hangfirePage.goToProcessHFJobs(db, fileDetails, true);
     await db.validateHandshakeJobStatus(fileDetails);
     console.log('Handshake job status validated in DB');
 
@@ -474,7 +473,7 @@ export class Orchestrator {
     const downloadPage = new DownloadPage(page);
     await downloadPage.setDownloadCriteria(fileDetails);
     const downloadDir = process.env.PW_DOWNLOADS_DIR || path.resolve(process.cwd(), 'downloads');
-    await downloadPage.downloadAndVerifyReturnFile(fileDetails, downloadDir, testName);
+    await downloadPage.downloadAndVerify(fileDetails, downloadDir, testName);
     if (!fileDetails.summaryReportFileName) {
       throw new Error('ClearCharge summary report was not downloaded.');
     }

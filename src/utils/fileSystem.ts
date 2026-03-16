@@ -3,7 +3,7 @@ import path from 'path';
 import { readFileSync, writeFileSync } from 'fs';
 import { loadEnv } from '../config/env';
 import { FileDetails } from '../models/fileDetails';
-import { generateBatchNumber, generateBmoInputFileName, generateFordReference, generateTdafReference, generateVwReference, generateVin } from './random';
+import { generateA8DigitReference, generateBatchNumber, generateBmoInputFileName, generateFordReference, generateTdafReference, generateVwReference, generateVin } from './random';
 
 const env = loadEnv();
 
@@ -438,6 +438,30 @@ function buildChangeOfProvinceFileName(fileDetails: FileDetails): string {
     default:
       return `DEFAULT_${formatTimestamp()}.txt`;
   }
+}
+
+function buildGmfclFileName(): string {
+  const now = new Date();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  const yyyy = now.getFullYear();
+  const MM = pad(now.getMonth() + 1);
+  const dd = pad(now.getDate());
+  const hh = pad(now.getHours());
+  const mm = pad(now.getMinutes());
+  const ss = pad(now.getSeconds());
+  return `GMFCL_${yyyy}${MM}${dd}_${hh}${mm}${ss}.xif`;
+}
+
+function buildGmfcrFileName(): string {
+  const now = new Date();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  const yyyy = now.getFullYear();
+  const MM = pad(now.getMonth() + 1);
+  const dd = pad(now.getDate());
+  const hh = pad(now.getHours());
+  const mm = pad(now.getMinutes());
+  const ss = pad(now.getSeconds());
+  return `GMFCR_${yyyy}${MM}${dd}_${hh}${mm}${ss}.xif`;
 }
 
 function buildSftpTarget(fileInfo: string, fileName: string): string {
@@ -975,5 +999,75 @@ export async function createBnsCommLookupFile(fileDetails: FileDetails): Promise
   await clearDirectory(targetDir);
   await copyFile(sourceFilePath, targetPath);
   fileDetails.inputFileName = inputFileName;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GMFCL file creation
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function updateGmfclFile(filePath: string, fileDetails: FileDetails): Promise<void> {
+  // Update batch number and partner reference in XIF file
+  await updateBatchNumberInXifFile(filePath, fileDetails.batchNumber!);
+  await updatePartnerReferenceInXifFile(filePath, fileDetails.partnerReference!);
+}
+
+export async function createGmfclNfFile(fileDetails: FileDetails): Promise<void> {
+  const scenarioArtifactsDir = path.join(process.cwd(), 'artifacts', fileDetails.scenarioId);
+  await ensureDirectory(scenarioArtifactsDir);
+
+  const inputFileName = buildGmfclFileName();
+  const sourceFilePath = path.join(scenarioArtifactsDir, inputFileName);
+  await copyFile(fileDetails.sampleFile, sourceFilePath);
+
+  // Generate batch number and partner reference
+  fileDetails.batchNumber = generateBatchNumber();
+  fileDetails.partnerReference = generateA8DigitReference();
+
+  await updateGmfclFile(sourceFilePath, fileDetails);
+
+  const targetPath = path.join(env.sftpRoot, 'GMFCLCR', 'in', inputFileName);
+  const targetDir = path.dirname(targetPath);
+  await ensureDirectory(targetDir);
+  await clearDirectory(targetDir);
+  await copyFile(sourceFilePath, targetPath);
+  fileDetails.inputFileName = inputFileName;
+  console.log(`✓ GMFCL file created: ${inputFileName}`);
+  console.log(`  Partner Reference: ${fileDetails.partnerReference}`);
+  console.log(`  Batch Number: ${fileDetails.batchNumber}`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GMFCR file creation
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function updateGmfcrFile(filePath: string, fileDetails: FileDetails): Promise<void> {
+  // Update batch number and partner reference in XIF file
+  await updateBatchNumberInXifFile(filePath, fileDetails.batchNumber!);
+  await updatePartnerReferenceInXifFile(filePath, fileDetails.partnerReference!);
+}
+
+export async function createGmfcrNfFile(fileDetails: FileDetails): Promise<void> {
+  const scenarioArtifactsDir = path.join(process.cwd(), 'artifacts', fileDetails.scenarioId);
+  await ensureDirectory(scenarioArtifactsDir);
+
+  const inputFileName = buildGmfcrFileName();
+  const sourceFilePath = path.join(scenarioArtifactsDir, inputFileName);
+  await copyFile(fileDetails.sampleFile, sourceFilePath);
+
+  // Generate batch number and partner reference
+  fileDetails.batchNumber = generateBatchNumber();
+  fileDetails.partnerReference = generateA8DigitReference();
+
+  await updateGmfcrFile(sourceFilePath, fileDetails);
+
+  const targetPath = path.join(env.sftpRoot, 'GMFCLCR', 'in', inputFileName);
+  const targetDir = path.dirname(targetPath);
+  await ensureDirectory(targetDir);
+  await clearDirectory(targetDir);
+  await copyFile(sourceFilePath, targetPath);
+  fileDetails.inputFileName = inputFileName;
+  console.log(`✓ GMFCR file created: ${inputFileName}`);
+  console.log(`  Partner Reference: ${fileDetails.partnerReference}`);
+  console.log(`  Batch Number: ${fileDetails.batchNumber}`);
 }
 

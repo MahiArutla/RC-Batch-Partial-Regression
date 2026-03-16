@@ -721,6 +721,144 @@ export class Orchestrator {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
+  // GMFCL NF Happy Path
+  // ─────────────────────────────────────────────────────────────────────────────
+  async runGmfclNfHappyPath(page: Page, scenarioId: string): Promise<FileDetails> {
+    const fileDetails = loadScenarioData(scenarioId);
+    fileDetails.sampleFile = path.resolve(process.cwd(), 'src', 'data', 'GMF', 'GMFCL_HappyPath.XIF');
+    fileDetails.scenarioId = scenarioId;
+
+    if (!fileDetails.inputFileDescription) {
+      throw new Error(
+        `InputFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the UniqueId.`
+      );
+    }
+
+    await fileSystem.createGmfclNfFile(fileDetails);
+
+    const db = new DbService();
+    fileDetails.batchType = 'NF';
+    await db.setProcessAndFileStatusToNotStarted(fileDetails);
+    const hangfirePage = new HangfireJobsPage(page);
+    await hangfirePage.goToProcessHFJobs(db, fileDetails);
+    await db.validateHandshakeJobStatus(fileDetails);
+    console.log('Handshake job status validated in DB for GMFCL');
+
+    const downloadPage = new DownloadPage(page);
+    const downloadDir = process.env.PW_DOWNLOADS_DIR || path.resolve(process.cwd(), 'downloads');
+    const testName = scenarioId;
+
+    // Download and verify client summary report
+    await downloadPage.setDownloadCriteria(fileDetails);
+    await downloadPage.downloadAndVerify(fileDetails, downloadDir, testName);
+    ExcelHelper.verifyImportedSuccessfullyGreaterThanZero(
+      path.join(process.cwd(), 'artifacts', testName, fileDetails.summaryReportFileName!)
+    );
+    console.log('GMFCL summary report downloaded and verified:', fileDetails.summaryReportFileName);
+
+    // Manual processing for MB province
+    const manualProcessingService = new ManualProcessingService();
+    const manualResponse = await manualProcessingService.processManualTransaction(fileDetails, 'MB', 'superuser');
+    console.log('Manual Processing API response for GMFCL MB province:', manualResponse);
+
+    // Generate and validate return file
+    if (!fileDetails.returnFileDescription) {
+      throw new Error(
+        `ReturnFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the Return UniqueId.`
+      );
+    }
+    fileDetails.downloadFileType = 'ReturnFile';
+    await this.downloadAndValidateReturnFileWithRetry(
+      page,
+      db,
+      hangfirePage,
+      downloadPage,
+      fileDetails,
+      downloadDir,
+      testName
+    );
+
+    console.log(
+      `GMFCL file processed with Batchnumber ${fileDetails.batchNumber}, ` +
+      `filename ${fileDetails.inputFileName}, PartnerReference ${fileDetails.partnerReference}, ` +
+      `OrderId ${fileDetails.orderId}, and ReturnFile ${fileDetails.returnFileName}`
+    );
+
+    return fileDetails;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // GMFCR NF Happy Path
+  // ─────────────────────────────────────────────────────────────────────────────
+  async runGmfcrNfHappyPath(page: Page, scenarioId: string): Promise<FileDetails> {
+    const fileDetails = loadScenarioData(scenarioId);
+    fileDetails.sampleFile = path.resolve(process.cwd(), 'src', 'data', 'GMF', 'GMFCR_HappyPath.XIF');
+    fileDetails.scenarioId = scenarioId;
+
+    if (!fileDetails.inputFileDescription) {
+      throw new Error(
+        `InputFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the UniqueId.`
+      );
+    }
+
+    await fileSystem.createGmfcrNfFile(fileDetails);
+
+    const db = new DbService();
+    fileDetails.batchType = 'NF';
+    await db.setProcessAndFileStatusToNotStarted(fileDetails);
+    const hangfirePage = new HangfireJobsPage(page);
+    await hangfirePage.goToProcessHFJobs(db, fileDetails);
+    await db.validateHandshakeJobStatus(fileDetails);
+    console.log('Handshake job status validated in DB for GMFCR');
+
+    const downloadPage = new DownloadPage(page);
+    const downloadDir = process.env.PW_DOWNLOADS_DIR || path.resolve(process.cwd(), 'downloads');
+    const testName = scenarioId;
+
+    // Download and verify client summary report
+    await downloadPage.setDownloadCriteria(fileDetails);
+    await downloadPage.downloadAndVerify(fileDetails, downloadDir, testName);
+    ExcelHelper.verifyImportedSuccessfullyGreaterThanZero(
+      path.join(process.cwd(), 'artifacts', testName, fileDetails.summaryReportFileName!)
+    );
+    console.log('GMFCR summary report downloaded and verified:', fileDetails.summaryReportFileName);
+
+    // Manual processing for MB province
+    const manualProcessingService = new ManualProcessingService();
+    const manualResponse = await manualProcessingService.processManualTransaction(fileDetails, 'MB', 'superuser');
+    console.log('Manual Processing API response for GMFCR MB province:', manualResponse);
+
+    // Generate and validate return file
+    if (!fileDetails.returnFileDescription) {
+      throw new Error(
+        `ReturnFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the Return UniqueId.`
+      );
+    }
+    fileDetails.downloadFileType = 'ReturnFile';
+    await this.downloadAndValidateReturnFileWithRetry(
+      page,
+      db,
+      hangfirePage,
+      downloadPage,
+      fileDetails,
+      downloadDir,
+      testName
+    );
+
+    console.log(
+      `GMFCR file processed with Batchnumber ${fileDetails.batchNumber}, ` +
+      `filename ${fileDetails.inputFileName}, PartnerReference ${fileDetails.partnerReference}, ` +
+      `OrderId ${fileDetails.orderId}, and ReturnFile ${fileDetails.returnFileName}`
+    );
+
+    return fileDetails;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
   // Private helpers
   // ─────────────────────────────────────────────────────────────────────────────
   private async downloadAndValidateReturnFileWithRetry(

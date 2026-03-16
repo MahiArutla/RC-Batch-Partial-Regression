@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="ISO-8859-1" standalone="no"?>
+<Xif-Document Database="ONAT4" Direction="Import" Version="v3.3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<Batch Number="8192023">
+		<Date Format="yyyy-MM-dd">2024-10-17</Date>
+	</Batch>
+	<Registration-List>
+		<New-Registration>
+			<Partner-Reference>CR22_MB</Partner-Reference>
+			<PPR Province="MB"/>
+			<Contract>
+				<Date Format="yyyy-MM-dd">2024-10-15</Date>
+				<Type>Lease</Type>
+				<Term Unit="Month">60</Term>
+				<Expiry-Date Format="yyyy-MM-dd">2025-09-15</Expiry-Date>
+				<Maturity-Date Format="yyyy-MM-dd">2025-09-15</Maturity-Date>
+				<Amount>24464.90</Amount>
+				<Out-Province>No</Out-Province>
+				<MB.Trust-Indenture>No</MB.Trust-Indenture>
+				<MB.PMSI></MB.PMSI>
+				<MB.Proceeds>No</MB.Proceeds>
+				<MB.All-Property>No</MB.All-Property>
+			</Contract>
+			<Party-List>
+				<Secured-Party>
+					<Transit>1012</Transit>
+				</Secured-Party>
+				<Debtor-Individual-Party>
+					<First-Name>GUM</First-Name>
+					<Last-Name>CHEWY</Last-Name>
+					<Birth-Date Format="yyyy-MM-dd">1995-01-01</Birth-Date>
+					<Address>
+						<Street>DUNN ST</Street>
+						<City>CALGARY</City>
+						<Province>MB</Province>
+						<Postal-Code>R4R4R4</Postal-Code>
+					</Address>
+					<ON.Notify-Language>English</ON.Notify-Language>
+				</Debtor-Individual-Party>
+				<Debtor-Business-Party>
+					<Name>Teranet</Name>
+					<Address>
+						<Street>100-11351 Bridgeport Rd</Street>
+						<City>Richmond</City>
+						<Province>MB</Province>
+						<Postal-Code>R4R4R4</Postal-Code>
+					</Address>
+					<ON.Notify-Language>English</ON.Notify-Language>
+				</Debtor-Business-Party>
+			</Party-List>
+			<Collaterals>
+				<Serial-Collateral>
+					<Serial-Number>WAUBGBFL7CA115482</Serial-Number>
+					<Make>Audi</Make>
+					<Model>S4</Model>
+					<Year>2012</Year>
+					<Category>Motor Vehicle</Category>
+				</Serial-Collateral>
+			</Collaterals>
+		</New-Registration>
+	</Registration-List>
+</Xif-Document>

@@ -701,6 +701,53 @@ export async function createBnsCommDischargeXml(fileDetails: FileDetails): Promi
   await copyFile(dischargeLocalFilePath, targetPath);
 }
 
+export async function createBnsCommAmendmentXml(fileDetails: FileDetails): Promise<void> {
+  // Use sampleFile as the template path
+  const amendmentTemplatePath = fileDetails.sampleFile;
+  const scenarioArtifactsDir = path.resolve(process.cwd(), 'artifacts', fileDetails.scenarioId);
+  await fs.mkdir(scenarioArtifactsDir, { recursive: true });
+  const amendmentInputFileName = `xifdoc${formatAdjustedTimestamp()}.xml`;
+  const amendmentLocalFilePath = path.join(scenarioArtifactsDir, amendmentInputFileName);
+  await fs.copyFile(amendmentTemplatePath, amendmentLocalFilePath);
+
+  // Update batch number
+  let newBatchNumber = generateBatchNumber();
+  if (newBatchNumber.startsWith('-')) {
+    newBatchNumber = newBatchNumber.replace(/^-+/, '');
+  }
+  await updateBatchNumberInXifFile(amendmentLocalFilePath, newBatchNumber);
+
+  // Update partner reference
+  if (!fileDetails.partnerReference) {
+    throw new Error('partnerReference is undefined');
+  }
+  await updatePartnerReferenceInXifFile(amendmentLocalFilePath, fileDetails.partnerReference);
+
+  // Update PPR-Registration-Number
+  let amendmentContent = await fs.readFile(amendmentLocalFilePath, 'utf-8');
+  if (fileDetails.baseRegistrationNum) {
+    if (amendmentContent.match(/<PPR-Registration-Number>.*<\/PPR-Registration-Number>/i)) {
+      amendmentContent = amendmentContent.replace(/(<PPR-Registration-Number>)[^<]*(<\/PPR-Registration-Number>)/i, `$1${fileDetails.baseRegistrationNum}$2`);
+    } else if (amendmentContent.match(/<PPR-Registration-Number\s*\/?>(?!<)/i)) {
+      amendmentContent = amendmentContent.replace(/<PPR-Registration-Number\s*\/?>(?!<)/i, `<PPR-Registration-Number>${fileDetails.baseRegistrationNum}</PPR-Registration-Number>`);
+    }
+    await fs.writeFile(amendmentLocalFilePath, amendmentContent, 'utf-8');
+  } else {
+    throw new Error('baseRegistrationNum from cycle 1 is undefined');
+  }
+
+  // Update fileDetails for SFTP upload
+  fileDetails.sampleFile = amendmentLocalFilePath;
+  fileDetails.batchNumber = newBatchNumber;
+  fileDetails.inputFileName = amendmentInputFileName;
+
+  const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', amendmentInputFileName);
+  const targetDir = path.dirname(targetPath);
+  await ensureDirectory(targetDir);
+  await clearDirectory(targetDir);
+  await copyFile(amendmentLocalFilePath, targetPath);
+}
+
 export async function createNfFileByClient(fileDetails: FileDetails): Promise<void> {
   const ext = (path.extname(fileDetails.sampleFile || '') || '').toLowerCase();
   const client = (fileDetails.client || '').toUpperCase();

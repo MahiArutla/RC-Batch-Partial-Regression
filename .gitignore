@@ -91,6 +91,12 @@ Thumbs.db
 *.swo
 *~
 
+# Claude Code
+.claude/
+
+# Git hooks
+.githooks/
+
 # Temporary files
 *.tmp
 *.temp

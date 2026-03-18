@@ -1105,6 +1105,13 @@ export class Orchestrator {
     await db.setProcessAndFileStatusToNotStarted(fileDetails);
   }
 
+  async createNfFile(fileDetails: FileDetails): Promise<void> {
+    await fileSystem.createNfFileByClient(fileDetails);
+    const db = new DbService();
+    fileDetails.batchType = 'NF';
+    await db.setProcessAndFileStatusToNotStarted(fileDetails);
+  }
+
   async runAllProvinceHappyPath(page: Page, fileDetails: FileDetails): Promise<void> {
     const db = new DbService();
     const hangfireWorkflow = new HangfireWorkflow(db);

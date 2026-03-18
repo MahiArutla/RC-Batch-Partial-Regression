@@ -117,15 +117,22 @@ export async function updateSerialNumberInXifFile(filePath: string, serialNumber
 export async function clearDirectory(targetDir: string): Promise<void> {
   try {
     const entries = await fs.readdir(targetDir, { withFileTypes: true });
-    await Promise.all(
-      entries.map(async (entry) => {
-        if (!entry.isFile()) return;
-        const filePath = path.join(targetDir, entry.name);
-        await fs.unlink(filePath);
-      })
-    );
-  } catch {
+    const files = entries.filter(entry => entry.isFile());
+
+    if (files.length > 0) {
+      console.log(`Clearing ${files.length} file(s) from ${targetDir}`);
+      await Promise.all(
+        files.map(async (entry) => {
+          const filePath = path.join(targetDir, entry.name);
+          console.log(`Deleting: ${entry.name}`);
+          await fs.unlink(filePath);
+        })
+      );
+      console.log(`Directory cleared: ${targetDir}`);
+    }
+  } catch (error) {
     // Ignore errors (e.g., directory does not exist); caller may create it
+    console.log(`clearDirectory: ${targetDir} - ${error instanceof Error ? error.message : 'Directory does not exist'}`);
   }
 }
 
@@ -372,7 +379,18 @@ function formatTimestampWithMillis(): string {
 function buildNfFileName(fileDetails: FileDetails): string {
   switch (fileDetails.client.toUpperCase()) {
     case 'GBC':
-      return `PPtoDH_${formatTimestamp()}.XIF`;
+      // Format: PPtoDH_yyyymmdd_hhmmss.XIF (24-hour format)
+      const d = new Date();
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      const yyyy = d.getFullYear();
+      const MM = pad(d.getMonth() + 1);
+      const dd = pad(d.getDate());
+      const hh = pad(d.getHours());
+      const mm = pad(d.getMinutes());
+      const ss = pad(d.getSeconds());
+      const fileName = `PPtoDH_${yyyy}${MM}${dd}_${hh}${mm}${ss}.XIF`;
+      console.log(`GBC filename generated: ${fileName}`);
+      return fileName;
     case 'TDAF':
       return `TDC50toPPSA.${formatTimestampWithMillis()}.XIF`;
     case 'CLEARCHARGE':
@@ -483,7 +501,8 @@ function buildSftpTarget(fileInfo: string, fileName: string): string {
 }
 
 const sftpFolderByClient: Record<string, string> = {
-  BMO: path.join('BMO', 'in')
+  BMO: path.join('BMO', 'in'),
+  GBC: path.join('gbc', 'in')
 };
 
 function buildSftpPathForClient(client: string, fileName: string): string {
@@ -633,7 +652,8 @@ export async function createBnsCommNfXml(fileDetails: FileDetails): Promise<void
   const scenarioArtifactsDir = path.join(process.cwd(), 'artifacts', fileDetails.scenarioId);
   await ensureDirectory(scenarioArtifactsDir);
 
-  const inputFileName = `xifdoc${formatAdjustedTimestamp()}.XML`;
+  // Format: xifdoc_yyyy-MM-dd_HH-mm-ss_f.xml
+  const inputFileName = `xifdoc${formatAdjustedTimestamp()}.xml`;
   const localFilePath = path.join(scenarioArtifactsDir, inputFileName);
   await copyFile(fileDetails.sampleFile, localFilePath);
 
@@ -654,12 +674,43 @@ export async function createBnsCommNfXml(fileDetails: FileDetails): Promise<void
   await copyFile(localFilePath, targetPath);
 }
 
+export async function createBnsCommNfXmlWithBatchNumber(fileDetails: FileDetails, batchNumber: string): Promise<void> {
+  const scenarioArtifactsDir = path.join(process.cwd(), 'artifacts', fileDetails.scenarioId);
+  await ensureDirectory(scenarioArtifactsDir);
+
+  // Format: xifdoc_yyyy-MM-dd_HH-mm-ss_f.xml
+  const inputFileName = `xifdoc${formatAdjustedTimestamp()}.xml`;
+  const localFilePath = path.join(scenarioArtifactsDir, inputFileName);
+  await copyFile(fileDetails.sampleFile, localFilePath);
+
+  // Use the provided batch number instead of generating a new one
+  fileDetails.batchNumber = batchNumber;
+  // Only generate partnerReference if not already set
+  if (!fileDetails.partnerReference) {
+    fileDetails.partnerReference = generateA8DigitReference();
+  }
+
+  await updateBatchNumberInXifFile(localFilePath, fileDetails.batchNumber);
+  await updatePartnerReferenceInXifFile(localFilePath, fileDetails.partnerReference);
+
+  fileDetails.inputFileName = inputFileName;
+
+  const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', inputFileName);
+  const targetDir = path.dirname(targetPath);
+  await ensureDirectory(targetDir);
+  await clearDirectory(targetDir);
+  await copyFile(localFilePath, targetPath);
+
+  console.log(`Created BNS COMM NF file with duplicate batch number: ${batchNumber}`);
+  console.log(`File uploaded to: ${targetPath}`);
+}
+
 export async function createBnsCommDischargeXml(fileDetails: FileDetails): Promise<void> {
   // Use sampleFile as the template path
   const dischargeTemplatePath = fileDetails.sampleFile;
   const scenarioArtifactsDir = path.resolve(process.cwd(), 'artifacts', fileDetails.scenarioId);
   await fs.mkdir(scenarioArtifactsDir, { recursive: true });
-  const dischargeInputFileName = `xifdoc${formatAdjustedTimestamp()}.XML`;
+  const dischargeInputFileName = `xifdoc${formatAdjustedTimestamp()}.xml`;
   const dischargeLocalFilePath = path.join(scenarioArtifactsDir, dischargeInputFileName);
   await fs.copyFile(dischargeTemplatePath, dischargeLocalFilePath);
 
@@ -693,12 +744,112 @@ export async function createBnsCommDischargeXml(fileDetails: FileDetails): Promi
   fileDetails.sampleFile = dischargeLocalFilePath;
   fileDetails.batchNumber = newBatchNumber;
   fileDetails.inputFileName = dischargeInputFileName;
-  
+
   const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', dischargeInputFileName);
   const targetDir = path.dirname(targetPath);
   await ensureDirectory(targetDir);
   await clearDirectory(targetDir);
   await copyFile(dischargeLocalFilePath, targetPath);
+}
+
+export async function createBnsCommRenewalXmlWithBatchNumber(
+  fileDetails: FileDetails,
+  batchNumber: string,
+  registrationNumber: string,
+  partnerReference: string
+): Promise<void> {
+  const scenarioArtifactsDir = path.resolve(process.cwd(), 'artifacts', fileDetails.scenarioId);
+  await fs.mkdir(scenarioArtifactsDir, { recursive: true });
+
+  // Format: xifdoc_yyyy-MM-dd_HH-mm-ss_f.xml
+  const renewalInputFileName = `xifdoc${formatAdjustedTimestamp()}.xml`;
+  const renewalLocalFilePath = path.join(scenarioArtifactsDir, renewalInputFileName);
+  await fs.copyFile(fileDetails.sampleFile, renewalLocalFilePath);
+
+  // Use the provided batch number instead of generating a new one
+  fileDetails.batchNumber = batchNumber;
+  fileDetails.partnerReference = partnerReference;
+  fileDetails.baseRegistrationNum = registrationNumber;
+
+  // Update batch number
+  await updateBatchNumberInXifFile(renewalLocalFilePath, fileDetails.batchNumber);
+
+  // Update partner reference
+  await updatePartnerReferenceInXifFile(renewalLocalFilePath, fileDetails.partnerReference);
+
+  // Update PPR-Registration-Number
+  let renewalContent = await fs.readFile(renewalLocalFilePath, 'utf-8');
+  if (fileDetails.baseRegistrationNum) {
+    if (renewalContent.match(/<PPR-Registration-Number>.*<\/PPR-Registration-Number>/i)) {
+      renewalContent = renewalContent.replace(/(<PPR-Registration-Number>)[^<]*(<\/PPR-Registration-Number>)/i, `$1${fileDetails.baseRegistrationNum}$2`);
+    } else if (renewalContent.match(/<PPR-Registration-Number\s*\/?>(?!<)/i)) {
+      renewalContent = renewalContent.replace(/<PPR-Registration-Number\s*\/?>(?!<)/i, `<PPR-Registration-Number>${fileDetails.baseRegistrationNum}</PPR-Registration-Number>`);
+    }
+    await fs.writeFile(renewalLocalFilePath, renewalContent, 'utf-8');
+  } else {
+    throw new Error('baseRegistrationNum from cycle 1 is undefined');
+  }
+
+  fileDetails.inputFileName = renewalInputFileName;
+
+  const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', renewalInputFileName);
+  const targetDir = path.dirname(targetPath);
+  await ensureDirectory(targetDir);
+  await clearDirectory(targetDir);
+  await copyFile(renewalLocalFilePath, targetPath);
+
+  console.log(`Created BNS COMM Renewal file with duplicate batch number: ${batchNumber}`);
+  console.log(`File uploaded to: ${targetPath}`);
+}
+
+export async function createBnsCommDischargeXmlWithBatchNumber(
+  fileDetails: FileDetails,
+  batchNumber: string,
+  registrationNumber: string,
+  partnerReference: string
+): Promise<void> {
+  const scenarioArtifactsDir = path.resolve(process.cwd(), 'artifacts', fileDetails.scenarioId);
+  await fs.mkdir(scenarioArtifactsDir, { recursive: true });
+
+  // Format: xifdoc_yyyy-MM-dd_HH-mm-ss_f.xml
+  const dischargeInputFileName = `xifdoc${formatAdjustedTimestamp()}.xml`;
+  const dischargeLocalFilePath = path.join(scenarioArtifactsDir, dischargeInputFileName);
+  await fs.copyFile(fileDetails.sampleFile, dischargeLocalFilePath);
+
+  // Use the provided batch number instead of generating a new one
+  fileDetails.batchNumber = batchNumber;
+  fileDetails.partnerReference = partnerReference;
+  fileDetails.baseRegistrationNum = registrationNumber;
+
+  // Update batch number
+  await updateBatchNumberInXifFile(dischargeLocalFilePath, fileDetails.batchNumber);
+
+  // Update partner reference
+  await updatePartnerReferenceInXifFile(dischargeLocalFilePath, fileDetails.partnerReference);
+
+  // Update PPR-Registration-Number
+  let dischargeContent = await fs.readFile(dischargeLocalFilePath, 'utf-8');
+  if (fileDetails.baseRegistrationNum) {
+    if (dischargeContent.match(/<PPR-Registration-Number>.*<\/PPR-Registration-Number>/i)) {
+      dischargeContent = dischargeContent.replace(/(<PPR-Registration-Number>)[^<]*(<\/PPR-Registration-Number>)/i, `$1${fileDetails.baseRegistrationNum}$2`);
+    } else if (dischargeContent.match(/<PPR-Registration-Number\s*\/?>(?!<)/i)) {
+      dischargeContent = dischargeContent.replace(/<PPR-Registration-Number\s*\/?>(?!<)/i, `<PPR-Registration-Number>${fileDetails.baseRegistrationNum}</PPR-Registration-Number>`);
+    }
+    await fs.writeFile(dischargeLocalFilePath, dischargeContent, 'utf-8');
+  } else {
+    throw new Error('baseRegistrationNum from cycle 1 is undefined');
+  }
+
+  fileDetails.inputFileName = dischargeInputFileName;
+
+  const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', dischargeInputFileName);
+  const targetDir = path.dirname(targetPath);
+  await ensureDirectory(targetDir);
+  await clearDirectory(targetDir);
+  await copyFile(dischargeLocalFilePath, targetPath);
+
+  console.log(`Created BNS COMM Discharge file with duplicate batch number: ${batchNumber}`);
+  console.log(`File uploaded to: ${targetPath}`);
 }
 
 export async function createBnsCommAmendmentXml(fileDetails: FileDetails): Promise<void> {
@@ -894,7 +1045,7 @@ async function updateGreenlightDischargeFile(filePath: string, fileDetails: File
 
 function buildBnsCommExternalFileName(): string {
   // Use same format as BNS_COMM NF
-  return `xifdoc${formatAdjustedTimestamp()}.XML`;
+  return `xifdoc${formatAdjustedTimestamp()}.xml`;
 }
 
 async function updateBnsCommExternalFile(filePath: string, fileDetails: FileDetails): Promise<void> {
@@ -961,7 +1112,7 @@ export async function createBnsCommExternalFile(fileDetails: FileDetails): Promi
 }
 
 function buildBnsCommSearchFileName(): string {
-  return `xifdoc${formatAdjustedTimestamp()}.XML`;
+  return `xifdoc${formatAdjustedTimestamp()}.xml`;
 }
 
 async function updateBnsCommSearchFile(filePath: string, fileDetails: FileDetails): Promise<void> {
@@ -1006,7 +1157,7 @@ export async function createBnsCommSearchFile(fileDetails: FileDetails): Promise
 }
 
 function buildBnsCommLookupFileName(): string {
-  return `xifdoc${formatAdjustedTimestamp()}.XML`;
+  return `xifdoc${formatAdjustedTimestamp()}.xml`;
 }
 
 async function updateBnsCommLookupFile(filePath: string, fileDetails: FileDetails): Promise<void> {

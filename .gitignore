@@ -100,3 +100,6 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# MCP configuration (contains secrets)
+.mcp.json

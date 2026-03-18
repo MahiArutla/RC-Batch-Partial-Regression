@@ -222,4 +222,37 @@ export class HangfireJobsPage {
     await this.triggerNow.click();
     await this.page.waitForTimeout(1000);
   }
+
+  async navigateToEnqueuedJobs(): Promise<void> {
+    await this.hangFireJobs.click();
+    console.log('Navigated to Enqueued Jobs');
+  }
+
+  async navigateToFailedJobs(): Promise<void> {
+    await this.failedJobs.click();
+    console.log('Navigated to Failed Jobs');
+  }
+
+  async validateDuplicateBatchNumberError(batchNumber: string): Promise<{ count: number; message: string }> {
+    // Wait a bit for the failed job to appear
+    await this.page.waitForTimeout(2000);
+
+    // Locator for error message containing "Error: BatchNumber:" and "already exists"
+    const errorLocator = this.hangfireFrame.locator(
+      `//*[contains(text(), 'Error: BatchNumber:') and contains(text(), 'already exists')]`
+    );
+
+    const count = await errorLocator.count();
+    let message = '';
+
+    if (count > 0) {
+      message = await errorLocator.first().textContent() || '';
+      console.log(`Found ${count} duplicate batch number error(s)`);
+      console.log(`Error message: ${message}`);
+    } else {
+      console.log('No duplicate batch number errors found');
+    }
+
+    return { count, message };
+  }
 }

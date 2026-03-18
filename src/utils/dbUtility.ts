@@ -440,4 +440,48 @@ export class DbService {
       }
     }
   }
+
+  async getExistingBatchNumber(client: string, fallbackClient?: string): Promise<string> {
+    const pool = await this.getPool();
+
+    // Try primary client first
+    let result = await pool
+      .request()
+      .input('client', sql.VarChar(50), client)
+      .query(
+        'SELECT TOP 1 BatchNumber ' +
+          'FROM RegistrationCGeJson ' +
+          'WHERE ClientInfoId = (SELECT Id FROM dbo.ClientInfo WHERE CorporationCode = @client) ' +
+          'ORDER BY UpdatedDateTime DESC'
+      );
+    let batchNumber = result.recordset[0]?.BatchNumber;
+
+    // If no data found and fallback client provided, try fallback
+    if (!batchNumber && fallbackClient) {
+      console.log(`No batch number found for ${client}, trying fallback client: ${fallbackClient}`);
+      result = await pool
+        .request()
+        .input('client', sql.VarChar(50), fallbackClient)
+        .query(
+          'SELECT TOP 1 BatchNumber ' +
+            'FROM RegistrationCGeJson ' +
+            'WHERE ClientInfoId = (SELECT Id FROM dbo.ClientInfo WHERE CorporationCode = @client) ' +
+            'ORDER BY UpdatedDateTime DESC'
+        );
+      batchNumber = result.recordset[0]?.BatchNumber;
+      if (batchNumber) {
+        console.log(`Retrieved existing batch number from ${fallbackClient}: ${batchNumber}`);
+        return batchNumber;
+      }
+    }
+
+    if (!batchNumber) {
+      throw new Error(
+        `No existing batch number found for client: ${client}` +
+        (fallbackClient ? ` or fallback client: ${fallbackClient}` : '')
+      );
+    }
+    console.log(`Retrieved existing batch number for ${client}: ${batchNumber}`);
+    return batchNumber;
+  }
 }

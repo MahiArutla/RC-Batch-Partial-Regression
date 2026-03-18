@@ -18,7 +18,6 @@ export class HangfireWorkflow {
   constructor(private readonly dbService: DbService) {}
 
   async runAllProvinceHappyPath(page: Page, fileDetails: FileDetails): Promise<void> {
-    await this.login(page);
     const homePage = new HomePage(page);
     await homePage.openHangfireJobs();
 

@@ -255,4 +255,35 @@ export class HangfireJobsPage {
 
     return { count, message };
   }
+
+  async validateInvalidFileTypeError(fileName: string): Promise<{ count: number; message: string }> {
+    // Wait a bit for the failed job to appear
+    await this.page.waitForTimeout(2000);
+
+    // Locator for error message containing file type, extension, or unsupported format errors
+    const errorLocator = this.hangfireFrame.locator(
+      `//*[contains(text(), 'invalid') or contains(text(), 'extension') or contains(text(), 'unsupported') or contains(text(), 'file type') or contains(text(), '${fileName}')]`
+    );
+
+    const count = await errorLocator.count();
+    let message = '';
+
+    if (count > 0) {
+      message = await errorLocator.first().textContent() || '';
+      console.log(`Found ${count} invalid file type error(s)`);
+      console.log(`Error message: ${message}`);
+    } else {
+      // If no specific error found, check if there are any failed jobs at all
+      const anyFailedJob = this.hangfireFrame.locator('//div[@class="js-jobs-list"]//tr[contains(@class, "failed") or .//span[contains(@class, "label-danger")]]');
+      const failedCount = await anyFailedJob.count();
+      if (failedCount > 0) {
+        message = await anyFailedJob.first().textContent() || 'File processing failed';
+        console.log(`Found ${failedCount} failed job(s) - file type validation may have failed`);
+      } else {
+        console.log('No invalid file type errors or failed jobs found');
+      }
+    }
+
+    return { count, message };
+  }
 }

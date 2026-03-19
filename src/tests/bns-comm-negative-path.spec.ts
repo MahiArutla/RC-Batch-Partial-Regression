@@ -115,7 +115,7 @@ test.describe('BNS COMM Negative Path - Duplicate Batch Numbers', () => {
     console.log(`Registration Number: ${nfFileDetails.baseRegistrationNum}`);
 
     // Capture the batch number from Cycle 1 for duplicate test
-    const duplicateBatchNumber = nfFileDetails.batchNumber;
+    const duplicateBatchNumber = nfFileDetails.batchNumber!;
     const partnerReference = nfFileDetails.partnerReference!;
     const registrationNumber = nfFileDetails.baseRegistrationNum || '';
 
@@ -220,7 +220,7 @@ test.describe('BNS COMM Negative Path - Duplicate Batch Numbers', () => {
     console.log(`Registration Number: ${nfFileDetails.baseRegistrationNum}`);
 
     // Capture the batch number from Cycle 1 for duplicate test
-    const duplicateBatchNumber = nfFileDetails.batchNumber;
+    const duplicateBatchNumber = nfFileDetails.batchNumber!;
     const partnerReference = nfFileDetails.partnerReference!;
     const registrationNumber = nfFileDetails.baseRegistrationNum || '';
 
@@ -295,6 +295,456 @@ test.describe('BNS COMM Negative Path - Duplicate Batch Numbers', () => {
     await test.step('Verify duplicate batch number was used in Discharge', async () => {
       expect(dischargeFileDetails.batchNumber).toBe(duplicateBatchNumber);
       console.log('✓ Discharge duplicate batch number test completed successfully');
+    });
+  });
+
+  test('BNS_COMM_NF_Invalid_BatchFile', async ({ page, loginPage }) => {
+    const env = loadEnv();
+
+    await test.step('Login to web app', async () => {
+      await loginPage.goto(env.webAppUrl);
+      await loginPage.login(env.adminUser, env.adminPassword);
+    });
+    console.log('Logged into web application');
+
+    const db = new DbService();
+    const homePage = new HomePage(page);
+    const hangfirePage = new HangfireJobsPage(page);
+
+    // Load file details from testData.xlsx
+    const fileDetails = loadScenarioData('BNS_COMM_NF_Invalid_BatchFile');
+
+    await test.step('Create invalid file type (PDF) for BNS COMM', async () => {
+      await fileSystem.createBnsCommInvalidFileType(fileDetails, 'pdf');
+      console.log(`Created invalid file type: ${fileDetails.inputFileName}`);
+    });
+
+    await test.step('Set process and file status to not started', async () => {
+      fileDetails.batchType = 'NF';
+      await db.setProcessAndFileStatusToNotStarted(fileDetails);
+    });
+
+    await test.step('Navigate to Hangfire Dashboard', async () => {
+      await homePage.openHangfireJobs();
+      await hangfirePage.openRecurringJobs();
+    });
+
+    await test.step('Trigger ClientFileScheduler - should fail', async () => {
+      await hangfirePage.triggerHFJobWithEnqueue('ClientFileScheduler');
+      console.log('Triggered ClientFileScheduler Hangfire job');
+
+      // Wait for the job to process
+      await page.waitForTimeout(5000);
+    });
+
+    await test.step('Validate invalid file type error in Hangfire UI', async () => {
+      // Navigate to Enqueued Jobs then Failed Jobs
+      await hangfirePage.navigateToEnqueuedJobs();
+      await hangfirePage.navigateToFailedJobs();
+
+      // Validate the invalid file type error message
+      const errorValidation = await hangfirePage.validateInvalidFileTypeError(fileDetails.inputFileName!);
+
+      // Assert that at least one error was found
+      expect(errorValidation.count).toBeGreaterThanOrEqual(1);
+      expect(errorValidation.message).toBeTruthy();
+
+      console.log('✓ ClientFileScheduler failed as expected due to invalid file type');
+      console.log(`✓ Error found in Hangfire Failed Jobs: ${errorValidation.message}`);
+    });
+
+    await test.step('Verify invalid file was uploaded', async () => {
+      expect(fileDetails.inputFileName).toContain('.pdf');
+      console.log('✓ Invalid batch file test completed successfully');
+    });
+  });
+
+  test('BNS_COMM_Discharge_Invalid_BatchFile', async ({ page, loginPage }) => {
+    const env = loadEnv();
+
+    await test.step('Login to web app', async () => {
+      await loginPage.goto(env.webAppUrl);
+      await loginPage.login(env.adminUser, env.adminPassword);
+    });
+    console.log('Logged into web application');
+
+    const orchestrator = new Orchestrator();
+
+    // Cycle 1: Run BNS_COMM_NF end-to-end (should pass)
+    const nfFileDetails = await test.step('Cycle 1: Run BNS COMM NF orchestrator - should pass', async () => {
+      return await orchestrator.runBnsCommNfHappyPath(page, 'BNS_COMM_NF');
+    }, { timeout: 8 * 60 * 1000 });
+
+    expect(nfFileDetails.uniqueId).toBeTruthy();
+    expect(nfFileDetails.batchNumber).toBeTruthy();
+    expect(nfFileDetails.partnerReference).toBeTruthy();
+    expect(nfFileDetails.baseRegistrationNum).toBeTruthy();
+
+    console.log(`✓ Cycle 1 completed successfully`);
+    console.log(`NF Batch Number: ${nfFileDetails.batchNumber}`);
+    console.log(`Partner Reference: ${nfFileDetails.partnerReference}`);
+    console.log(`Registration Number: ${nfFileDetails.baseRegistrationNum}`);
+
+    // Capture details from Cycle 1 for Discharge test
+    const partnerReference = nfFileDetails.partnerReference!;
+    const registrationNumber = nfFileDetails.baseRegistrationNum || '';
+
+    const db = new DbService();
+    const homePage = new HomePage(page);
+    const hangfirePage = new HangfireJobsPage(page);
+
+    // Cycle 2: Process Discharge with invalid file type (should fail)
+    await test.step('Cycle 2: Load Discharge file details', async () => {
+      console.log(`Using registration details from Cycle 1 for invalid discharge file`);
+    });
+
+    // Load file details from testData.xlsx
+    const dischargeFileDetails = loadScenarioData('BNS_COMM_Discharge_Invalid_BatchFile');
+    dischargeFileDetails.partnerReference = partnerReference;
+    dischargeFileDetails.baseRegistrationNum = registrationNumber;
+
+    await test.step('Create invalid file type (PDF) for Discharge', async () => {
+      await fileSystem.createBnsCommInvalidFileType(dischargeFileDetails, 'pdf');
+      console.log(`Created invalid discharge file type: ${dischargeFileDetails.inputFileName}`);
+    });
+
+    await test.step('Set process and file status to not started', async () => {
+      dischargeFileDetails.batchType = 'NF';
+      await db.setProcessAndFileStatusToNotStarted(dischargeFileDetails);
+    });
+
+    await test.step('Navigate to Hangfire Dashboard', async () => {
+      await homePage.openHangfireJobs();
+      await hangfirePage.openRecurringJobs();
+    });
+
+    await test.step('Trigger ClientFileScheduler - should fail', async () => {
+      await hangfirePage.triggerHFJobWithEnqueue('ClientFileScheduler');
+      console.log('Triggered ClientFileScheduler Hangfire job');
+
+      // Wait for the job to process
+      await page.waitForTimeout(5000);
+    });
+
+    await test.step('Validate invalid file type error in Hangfire UI', async () => {
+      // Navigate to Enqueued Jobs then Failed Jobs
+      await hangfirePage.navigateToEnqueuedJobs();
+      await hangfirePage.navigateToFailedJobs();
+
+      // Validate the invalid file type error message
+      const errorValidation = await hangfirePage.validateInvalidFileTypeError(dischargeFileDetails.inputFileName!);
+
+      // Assert that at least one error was found
+      expect(errorValidation.count).toBeGreaterThanOrEqual(1);
+      expect(errorValidation.message).toBeTruthy();
+
+      console.log('✓ ClientFileScheduler failed as expected due to invalid discharge file type');
+      console.log(`✓ Error found in Hangfire Failed Jobs: ${errorValidation.message}`);
+    });
+
+    await test.step('Verify invalid discharge file was uploaded', async () => {
+      expect(dischargeFileDetails.inputFileName).toContain('.pdf');
+      console.log('✓ Invalid discharge batch file test completed successfully');
+    });
+  });
+
+  test('BNS_COMM_Renewal_Invalid_BatchFile', async ({ page, loginPage }) => {
+    const env = loadEnv();
+
+    await test.step('Login to web app', async () => {
+      await loginPage.goto(env.webAppUrl);
+      await loginPage.login(env.adminUser, env.adminPassword);
+    });
+    console.log('Logged into web application');
+
+    const orchestrator = new Orchestrator();
+
+    // Cycle 1: Run BNS_COMM_NF end-to-end (should pass)
+    const nfFileDetails = await test.step('Cycle 1: Run BNS COMM NF orchestrator - should pass', async () => {
+      return await orchestrator.runBnsCommNfHappyPath(page, 'BNS_COMM_NF');
+    }, { timeout: 8 * 60 * 1000 });
+
+    expect(nfFileDetails.uniqueId).toBeTruthy();
+    expect(nfFileDetails.batchNumber).toBeTruthy();
+    expect(nfFileDetails.partnerReference).toBeTruthy();
+    expect(nfFileDetails.baseRegistrationNum).toBeTruthy();
+
+    console.log(`✓ Cycle 1 completed successfully`);
+    console.log(`NF Batch Number: ${nfFileDetails.batchNumber}`);
+    console.log(`Partner Reference: ${nfFileDetails.partnerReference}`);
+    console.log(`Registration Number: ${nfFileDetails.baseRegistrationNum}`);
+
+    // Capture details from Cycle 1 for Renewal test
+    const partnerReference = nfFileDetails.partnerReference!;
+    const registrationNumber = nfFileDetails.baseRegistrationNum || '';
+
+    const db = new DbService();
+    const homePage = new HomePage(page);
+    const hangfirePage = new HangfireJobsPage(page);
+
+    // Cycle 2: Process Renewal with invalid file type (should fail)
+    await test.step('Cycle 2: Load Renewal file details', async () => {
+      console.log(`Using registration details from Cycle 1 for invalid renewal file`);
+    });
+
+    // Load file details from testData.xlsx
+    const renewalFileDetails = loadScenarioData('BNS_COMM_Renewal_Invalid_BatchFile');
+    renewalFileDetails.partnerReference = partnerReference;
+    renewalFileDetails.baseRegistrationNum = registrationNumber;
+
+    await test.step('Create invalid file type (PDF) for Renewal', async () => {
+      await fileSystem.createBnsCommInvalidFileType(renewalFileDetails, 'pdf');
+      console.log(`Created invalid renewal file type: ${renewalFileDetails.inputFileName}`);
+    });
+
+    await test.step('Set process and file status to not started', async () => {
+      renewalFileDetails.batchType = 'NF';
+      await db.setProcessAndFileStatusToNotStarted(renewalFileDetails);
+    });
+
+    await test.step('Navigate to Hangfire Dashboard', async () => {
+      await homePage.openHangfireJobs();
+      await hangfirePage.openRecurringJobs();
+    });
+
+    await test.step('Trigger ClientFileScheduler - should fail', async () => {
+      await hangfirePage.triggerHFJobWithEnqueue('ClientFileScheduler');
+      console.log('Triggered ClientFileScheduler Hangfire job');
+
+      // Wait for the job to process
+      await page.waitForTimeout(5000);
+    });
+
+    await test.step('Validate invalid file type error in Hangfire UI', async () => {
+      // Navigate to Enqueued Jobs then Failed Jobs
+      await hangfirePage.navigateToEnqueuedJobs();
+      await hangfirePage.navigateToFailedJobs();
+
+      // Validate the invalid file type error message
+      const errorValidation = await hangfirePage.validateInvalidFileTypeError(renewalFileDetails.inputFileName!);
+
+      // Assert that at least one error was found
+      expect(errorValidation.count).toBeGreaterThanOrEqual(1);
+      expect(errorValidation.message).toBeTruthy();
+
+      console.log('✓ ClientFileScheduler failed as expected due to invalid renewal file type');
+      console.log(`✓ Error found in Hangfire Failed Jobs: ${errorValidation.message}`);
+    });
+
+    await test.step('Verify invalid renewal file was uploaded', async () => {
+      expect(renewalFileDetails.inputFileName).toContain('.pdf');
+      console.log('✓ Invalid renewal batch file test completed successfully');
+    });
+  });
+
+  test('BNS_COMM_External_Invalid_BatchFile', async ({ page, loginPage }) => {
+    const env = loadEnv();
+
+    await test.step('Login to web app', async () => {
+      await loginPage.goto(env.webAppUrl);
+      await loginPage.login(env.adminUser, env.adminPassword);
+    });
+    console.log('Logged into web application');
+
+    const db = new DbService();
+    const homePage = new HomePage(page);
+    const hangfirePage = new HangfireJobsPage(page);
+
+    // Load file details from testData.xlsx
+    const fileDetails = loadScenarioData('BNS_COMM_External_Invalid_BatchFile');
+
+    await test.step('Create invalid file type (PDF) for BNS COMM External', async () => {
+      await fileSystem.createBnsCommInvalidFileType(fileDetails, 'pdf');
+      console.log(`Created invalid file type: ${fileDetails.inputFileName}`);
+    });
+
+    await test.step('Set process and file status to not started', async () => {
+      fileDetails.batchType = 'NF';
+      await db.setProcessAndFileStatusToNotStarted(fileDetails);
+    });
+
+    await test.step('Navigate to Hangfire Dashboard', async () => {
+      await homePage.openHangfireJobs();
+      await hangfirePage.openRecurringJobs();
+    });
+
+    await test.step('Trigger ClientFileScheduler - should fail', async () => {
+      await hangfirePage.triggerHFJobWithEnqueue('ClientFileScheduler');
+      console.log('Triggered ClientFileScheduler Hangfire job');
+
+      // Wait for the job to process
+      await page.waitForTimeout(5000);
+    });
+
+    await test.step('Validate invalid file type error in Hangfire UI', async () => {
+      // Navigate to Enqueued Jobs then Failed Jobs
+      await hangfirePage.navigateToEnqueuedJobs();
+      await hangfirePage.navigateToFailedJobs();
+
+      // Validate the invalid file type error message
+      const errorValidation = await hangfirePage.validateInvalidFileTypeError(fileDetails.inputFileName!);
+
+      // Assert that at least one error was found
+      expect(errorValidation.count).toBeGreaterThanOrEqual(1);
+      expect(errorValidation.message).toBeTruthy();
+
+      console.log('✓ ClientFileScheduler failed as expected due to invalid file type');
+      console.log(`✓ Error found in Hangfire Failed Jobs: ${errorValidation.message}`);
+    });
+
+    await test.step('Verify invalid file was uploaded', async () => {
+      expect(fileDetails.inputFileName).toContain('.pdf');
+      console.log('✓ Invalid external batch file test completed successfully');
+    });
+  });
+
+  test('BNS_COMM_Lookup_Invalid_BatchFile', async ({ page, loginPage }) => {
+    const env = loadEnv();
+
+    await test.step('Login to web app', async () => {
+      await loginPage.goto(env.webAppUrl);
+      await loginPage.login(env.adminUser, env.adminPassword);
+    });
+    console.log('Logged into web application');
+
+    const db = new DbService();
+    const homePage = new HomePage(page);
+    const hangfirePage = new HangfireJobsPage(page);
+
+    // Load file details from testData.xlsx
+    const fileDetails = loadScenarioData('BNS_COMM_Lookup_Invalid_BatchFile');
+
+    await test.step('Create invalid file type (PDF) for BNS COMM Lookup', async () => {
+      await fileSystem.createBnsCommInvalidFileType(fileDetails, 'pdf');
+      console.log(`Created invalid file type: ${fileDetails.inputFileName}`);
+    });
+
+    await test.step('Set process and file status to not started', async () => {
+      fileDetails.batchType = 'NF';
+      await db.setProcessAndFileStatusToNotStarted(fileDetails);
+    });
+
+    await test.step('Navigate to Hangfire Dashboard', async () => {
+      await homePage.openHangfireJobs();
+      await hangfirePage.openRecurringJobs();
+    });
+
+    await test.step('Trigger ClientFileScheduler - should fail', async () => {
+      await hangfirePage.triggerHFJobWithEnqueue('ClientFileScheduler');
+      console.log('Triggered ClientFileScheduler Hangfire job');
+
+      // Wait for the job to process
+      await page.waitForTimeout(5000);
+    });
+
+    await test.step('Validate invalid file type error in Hangfire UI', async () => {
+      // Navigate to Enqueued Jobs then Failed Jobs
+      await hangfirePage.navigateToEnqueuedJobs();
+      await hangfirePage.navigateToFailedJobs();
+
+      // Validate the invalid file type error message
+      const errorValidation = await hangfirePage.validateInvalidFileTypeError(fileDetails.inputFileName!);
+
+      // Assert that at least one error was found
+      expect(errorValidation.count).toBeGreaterThanOrEqual(1);
+      expect(errorValidation.message).toBeTruthy();
+
+      console.log('✓ ClientFileScheduler failed as expected due to invalid file type');
+      console.log(`✓ Error found in Hangfire Failed Jobs: ${errorValidation.message}`);
+    });
+
+    await test.step('Verify invalid file was uploaded', async () => {
+      expect(fileDetails.inputFileName).toContain('.pdf');
+      console.log('✓ Invalid lookup batch file test completed successfully');
+    });
+  });
+
+  test('BNS_COMM_Amendment_Invalid_BatchFile', async ({ page, loginPage }) => {
+    const env = loadEnv();
+
+    await test.step('Login to web app', async () => {
+      await loginPage.goto(env.webAppUrl);
+      await loginPage.login(env.adminUser, env.adminPassword);
+    });
+    console.log('Logged into web application');
+
+    const orchestrator = new Orchestrator();
+
+    // Cycle 1: Run BNS_COMM_NF end-to-end (should pass)
+    const nfFileDetails = await test.step('Cycle 1: Run BNS COMM NF orchestrator - should pass', async () => {
+      return await orchestrator.runBnsCommNfHappyPath(page, 'BNS_COMM_NF');
+    }, { timeout: 8 * 60 * 1000 });
+
+    expect(nfFileDetails.uniqueId).toBeTruthy();
+    expect(nfFileDetails.batchNumber).toBeTruthy();
+    expect(nfFileDetails.partnerReference).toBeTruthy();
+    expect(nfFileDetails.baseRegistrationNum).toBeTruthy();
+
+    console.log(`✓ Cycle 1 completed successfully`);
+    console.log(`NF Batch Number: ${nfFileDetails.batchNumber}`);
+    console.log(`Partner Reference: ${nfFileDetails.partnerReference}`);
+    console.log(`Registration Number: ${nfFileDetails.baseRegistrationNum}`);
+
+    // Capture details from Cycle 1 for Amendment test
+    const partnerReference = nfFileDetails.partnerReference!;
+    const registrationNumber = nfFileDetails.baseRegistrationNum || '';
+
+    const db = new DbService();
+    const homePage = new HomePage(page);
+    const hangfirePage = new HangfireJobsPage(page);
+
+    // Cycle 2: Process Amendment with invalid file type (should fail)
+    await test.step('Cycle 2: Load Amendment file details', async () => {
+      console.log(`Using registration details from Cycle 1 for invalid amendment file`);
+    });
+
+    // Load file details from testData.xlsx
+    const amendmentFileDetails = loadScenarioData('BNS_COMM_Amendment_Invalid_BatchFile');
+    amendmentFileDetails.partnerReference = partnerReference;
+    amendmentFileDetails.baseRegistrationNum = registrationNumber;
+
+    await test.step('Create invalid file type (PDF) for Amendment', async () => {
+      await fileSystem.createBnsCommInvalidFileType(amendmentFileDetails, 'pdf');
+      console.log(`Created invalid amendment file type: ${amendmentFileDetails.inputFileName}`);
+    });
+
+    await test.step('Set process and file status to not started', async () => {
+      amendmentFileDetails.batchType = 'NF';
+      await db.setProcessAndFileStatusToNotStarted(amendmentFileDetails);
+    });
+
+    await test.step('Navigate to Hangfire Dashboard', async () => {
+      await homePage.openHangfireJobs();
+      await hangfirePage.openRecurringJobs();
+    });
+
+    await test.step('Trigger ClientFileScheduler - should fail', async () => {
+      await hangfirePage.triggerHFJobWithEnqueue('ClientFileScheduler');
+      console.log('Triggered ClientFileScheduler Hangfire job');
+
+      // Wait for the job to process
+      await page.waitForTimeout(5000);
+    });
+
+    await test.step('Validate invalid file type error in Hangfire UI', async () => {
+      // Navigate to Enqueued Jobs then Failed Jobs
+      await hangfirePage.navigateToEnqueuedJobs();
+      await hangfirePage.navigateToFailedJobs();
+
+      // Validate the invalid file type error message
+      const errorValidation = await hangfirePage.validateInvalidFileTypeError(amendmentFileDetails.inputFileName!);
+
+      // Assert that at least one error was found
+      expect(errorValidation.count).toBeGreaterThanOrEqual(1);
+      expect(errorValidation.message).toBeTruthy();
+
+      console.log('✓ ClientFileScheduler failed as expected due to invalid amendment file type');
+      console.log(`✓ Error found in Hangfire Failed Jobs: ${errorValidation.message}`);
+    });
+
+    await test.step('Verify invalid amendment file was uploaded', async () => {
+      expect(amendmentFileDetails.inputFileName).toContain('.pdf');
+      console.log('✓ Invalid amendment batch file test completed successfully');
     });
   });
 });

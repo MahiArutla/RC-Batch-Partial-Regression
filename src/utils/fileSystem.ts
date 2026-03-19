@@ -1199,6 +1199,66 @@ export async function createBnsCommLookupFile(fileDetails: FileDetails): Promise
   fileDetails.inputFileName = inputFileName;
 }
 
+export async function createBnsCommInvalidFileType(fileDetails: FileDetails, fileExtension: string = 'pdf'): Promise<void> {
+  const scenarioArtifactsDir = path.join(process.cwd(), 'artifacts', fileDetails.scenarioId);
+  await ensureDirectory(scenarioArtifactsDir);
+
+  // Create a filename with invalid extension (e.g., .pdf)
+  const inputFileName = `xifdoc${formatAdjustedTimestamp()}.${fileExtension}`;
+  const sourceFilePath = path.join(scenarioArtifactsDir, inputFileName);
+
+  // Create a simple PDF-like file content (minimal valid PDF structure)
+  const pdfContent = `%PDF-1.4
+1 0 obj
+<<
+/Type /Catalog
+/Pages 2 0 R
+>>
+endobj
+2 0 obj
+<<
+/Type /Pages
+/Kids [3 0 R]
+/Count 1
+>>
+endobj
+3 0 obj
+<<
+/Type /Page
+/Parent 2 0 R
+/MediaBox [0 0 612 792]
+>>
+endobj
+xref
+0 4
+0000000000 65535 f
+0000000009 00000 n
+0000000058 00000 n
+0000000115 00000 n
+trailer
+<<
+/Size 4
+/Root 1 0 R
+>>
+startxref
+190
+%%EOF`;
+
+  await fs.writeFile(sourceFilePath, pdfContent, 'utf-8');
+
+  fileDetails.inputFileName = inputFileName;
+  fileDetails.batchNumber = generateBatchNumber();
+
+  const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', inputFileName);
+  const targetDir = path.dirname(targetPath);
+  await ensureDirectory(targetDir);
+  await clearDirectory(targetDir);
+  await copyFile(sourceFilePath, targetPath);
+
+  console.log(`Created BNS COMM file with invalid type (.${fileExtension}): ${inputFileName}`);
+  console.log(`File uploaded to: ${targetPath}`);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // GMFCL file creation
 // ─────────────────────────────────────────────────────────────────────────────

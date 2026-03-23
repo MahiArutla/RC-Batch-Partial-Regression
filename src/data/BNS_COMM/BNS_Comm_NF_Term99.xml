@@ -5,7 +5,7 @@
 			<PPR Province="BC"/>
 			<Partner-Reference>BNS_COMM_Partial_REFNUM</Partner-Reference>
 			<Contract>
-				<Term Unit="Year">5</Term>
+				<Term Unit="Year">99</Term>
 				<ON.Accounts>YES</ON.Accounts>
 				<Shared-Income>NO</Shared-Income>
 				<ON.Inventory>Yes</ON.Inventory>

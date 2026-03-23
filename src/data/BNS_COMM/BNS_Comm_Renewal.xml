@@ -3,7 +3,7 @@
 	<Registration-List>
 		<Registration Type="Renewal">
 			<PPR Province="BC"/>
-			<Partner-Reference>BNS_COMM_SMOKE_REFNUM</Partner-Reference>
+			<Partner-Reference>BNS_COMM_Partial_REFNUM</Partner-Reference>
 			<Contract>
 				<Term Unit="Year">2</Term>
 				<Shared-Income>Yes</Shared-Income>

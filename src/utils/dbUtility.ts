@@ -351,6 +351,41 @@ export class DbService {
     }
   }
 
+  async validateHandshakeNotImported(fileDetails: FileDetails): Promise<void> {
+    const batchNumber = this.normalizeBatchNumber(fileDetails.batchNumber);
+
+    const row = await this.waitFor<any | null>(
+      async () => {
+        const pool = await this.getPool();
+        const result = await pool
+          .request()
+          .input('client', sql.VarChar(50), fileDetails.client)
+          .input('batchNumber', sql.VarChar(50), batchNumber)
+          .query(
+            'SELECT TOP 1 HTTPStatusCode, ImportOrderStatus, OrderId FROM RegistrationCGeJson ' +
+              'WHERE ClientInfoId = (SELECT Id FROM ClientInfo WHERE CorporationCode = @client) ' +
+              'AND BatchNumber = @batchNumber AND IsCurrentData = 1 AND JSONResponse != ' + "'NULL'" +
+              ' ORDER BY UpdatedDateTime DESC'
+          );
+        return result.recordset[0] ?? null;
+      },
+      (r) => !!r && r.ImportOrderStatus === 'NotImported',
+      { timeoutMs: 90_000, intervalMs: 2_000 }
+    );
+
+    if (!row) {
+      throw new Error('RegistrationCGeJson row not found for NotImported validation.');
+    }
+
+    if (row.ImportOrderStatus !== 'NotImported') {
+      throw new Error(
+        `Expected ImportOrderStatus to be NotImported but got: ${row.ImportOrderStatus}`
+      );
+    }
+
+    console.log(`Handshake validated with HTTPStatusCode = ${row.HTTPStatusCode}, ImportOrderStatus = ${row.ImportOrderStatus} (file was not imported as expected)`);
+  }
+
   async setProcessAndFileStatusToNotStartedReturn(fileDetails: FileDetails): Promise<void> {
     const type = fileDetails.batchType || 'Return';
     fileDetails.uniqueId = await this.getUniqueBatchFileId(fileDetails, type);

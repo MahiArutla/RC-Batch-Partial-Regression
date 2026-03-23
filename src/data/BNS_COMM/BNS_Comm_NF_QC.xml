@@ -2,25 +2,24 @@
 <Xif-Document Version="1.0" Database="ONCNS9" Direction="Import">
 	<Registration-List>
 			<Registration Type="New">
-			<PPR Province="BC"/>
+			<PPR Province="QC"/>
 			<Partner-Reference>BNS_COMM_Partial_REFNUM</Partner-Reference>
 			<Contract>
+				<Date Format="yyyy-MM-dd HH:mm:ss">2020-03-17 00:00:00</Date>
 				<Term Unit="Year">5</Term>
-				<ON.Accounts>YES</ON.Accounts>
+				<Location>
+					<City>Montreal</City>
+					<Province>Quebec</Province>
+				</Location>
+				<QC.Form Nature="C">RH</QC.Form>
 				<Shared-Income>NO</Shared-Income>
-				<ON.Inventory>Yes</ON.Inventory>
-				<ON.Equipment>Yes</ON.Equipment>
-				<ON.Consumer-Goods>No</ON.Consumer-Goods>
-				<ON.Accounts>Yes</ON.Accounts>
-				<ON.Other>Yes</ON.Other>
-				<ON.Veh-Include>Yes</ON.Veh-Include>
 				<Amount>1000000.00</Amount>
-				<Reason-Text>MW_4.6Regression_BCNFTest1</Reason-Text>
 			</Contract>
 			<Party-List>
 				<Party Type="Secured-Business">
+				<Sync-Id>1</Sync-Id>
 					<Address>
-						<Street>4715 Tahoe Blvd</Street>
+						<Street>4715 Tahoe Boulevard</Street>
 						<City>Mississauga</City>
 						<Postal-Code>L4W0B4</Postal-Code>
 						<Province>ON</Province>
@@ -28,12 +27,8 @@
 					<Name>The Bank of Nova Scotia</Name>
 				</Party>
 				<Party Type="Billing">
-					<Bank-Account Owner-Type="Customer">
-						<Bank-Number>0002</Bank-Number>
-						<Transit-Number>20008</Transit-Number>
-						<Account-Number>248020109916</Account-Number>
-					</Bank-Account>
-					<Transit>20008</Transit>
+					<Bank-Account Owner-Type="Branch"/>
+					<Transit>33993</Transit>
 				</Party>
 				<Party Type="Requesting">
 					<Transit>47696</Transit>
@@ -41,17 +36,17 @@
 				<Party Type="Debtor-Business">
 				<Sync-Id>1</Sync-Id>
 					<Address>
-						<Street>120 Jessup Lane</Street>
-						<City>Bath</City>
-						<Postal-Code>K0H1G0</Postal-Code>
-						<Province>ON</Province>
+						<Street>1045, rue des Parlementaires</Street>
+						<City>Quebec City</City>
+						<Postal-Code>G1A 1A3</Postal-Code>
+						<Province>QC</Province>
 					</Address>
 					<Post-Search>
-						<Fax-Number>0000047696</Fax-Number>
+						<Fax-Number>0000063081</Fax-Number>
 					</Post-Search>
-					<Name>Michael Ranger Physiotherapy Professional Corporation</Name>
+					<Name>FOREST FIRST AVIATION INC.</Name>
 				</Party>
-				<Party Type="Debtor-Individual" >
+				<Party Type="Debtor-Individual">
 				<Sync-Id>2</Sync-Id>
 					<Address>
 						<Street>1045, rue des Pasa</Street>
@@ -62,13 +57,13 @@
 					<Post-Search>
 						<Fax-Number>0000003020</Fax-Number>
 					</Post-Search>
-					<First-Name>Thomas</First-Name>
-					<Middle-Name>Reni Thomas</Middle-Name>
-					<Last-Name>A</Last-Name>
+					<First-Name>Roshan</First-Name>
+					<Middle-Name>Thomas A</Middle-Name>
+					<Last-Name>John</Last-Name>
 					<Birth-Date Format="yyyy-MM-dd HH:mm:ss">2020-10-16 00:00:00</Birth-Date>
 				</Party>
-				<Party Type="Debtor-Individual" >
-				<Sync-Id>3</Sync-Id>
+				<Party Type="Debtor-Individual">
+				<Sync-Id>2</Sync-Id>
 					<Address>
 						<Street>1045, rue des Pasa</Street>
 						<City>Gatineau </City>
@@ -78,16 +73,16 @@
 					<Post-Search>
 						<Fax-Number>0000003020</Fax-Number>
 					</Post-Search>
-					<First-Name>Reni</First-Name>
-					<Middle-Name>Thomas K I</Middle-Name>
-					<Last-Name>A</Last-Name>
+					<First-Name>Roshni</First-Name>
+					<Middle-Name>Thomas</Middle-Name>
+					<Last-Name>John</Last-Name>
 					<Birth-Date Format="yyyy-MM-dd HH:mm:ss">2020-10-16 00:00:00</Birth-Date>
 				</Party>
 			</Party-List>
 			<Collaterals>
 				<Collateral Type="General">
 				<Sync-Id>1</Sync-Id>
-					<Description>Test BC</Description>
+					<Description>Shares in the capital stock </Description>
 				</Collateral>
 				</Collaterals>
 		</Registration>

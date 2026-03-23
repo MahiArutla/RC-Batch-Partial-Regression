@@ -780,6 +780,159 @@ export class Orchestrator {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
+  // BNS COMM NF QC Happy Path
+  // ─────────────────────────────────────────────────────────────────────────────
+  async runBnsCommNfQcHappyPath(page: Page, scenarioId: string): Promise<FileDetails> {
+    const fileDetails = loadScenarioData(scenarioId);
+    fileDetails.sampleFile = path.resolve(process.cwd(), 'src', 'data', 'BNS_COMM', 'BNS_Comm_NF_QC.xml');
+    fileDetails.scenarioId = scenarioId;
+
+    if (!fileDetails.inputFileDescription) {
+      throw new Error(
+        `InputFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the UniqueId.`
+      );
+    }
+
+    await fileSystem.createBnsCommNfXml(fileDetails);
+
+    const db = new DbService();
+    fileDetails.batchType = 'NF';
+    await db.setProcessAndFileStatusToNotStarted(fileDetails);
+    const hangfirePage = new HangfireJobsPage(page);
+    await hangfirePage.goToProcessHFJobs(db, fileDetails);
+    await db.validateHandshakeJobStatus(fileDetails);
+    console.log('Handshake job status validated in DB for BNS COMM NF QC');
+
+    const manualProcessingService = new ManualProcessingService();
+    const manualResponse = await manualProcessingService.processManualTransaction(fileDetails, 'QC', 'superuser');
+    console.log('Manual Processing API response:', manualResponse);
+
+    const downloadPage = new DownloadPage(page);
+    const downloadDir = process.env.PW_DOWNLOADS_DIR || path.resolve(process.cwd(), 'downloads');
+    const testName = scenarioId;
+
+    if (!fileDetails.returnFileDescription) {
+      throw new Error(
+        `ReturnFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the Return UniqueId.`
+      );
+    }
+    fileDetails.downloadFileType = 'ReturnFile';
+    await this.downloadAndValidateReturnFileWithRetry(
+      page,
+      db,
+      hangfirePage,
+      downloadPage,
+      fileDetails,
+      downloadDir,
+      testName
+    );
+
+    console.log(
+      `BNS COMM NF QC file processed with Batchnumber ${fileDetails.batchNumber}, ` +
+      `filename ${fileDetails.inputFileName}, PartnerReference ${fileDetails.partnerReference}, ` +
+      `RegistrationNumber ${fileDetails.baseRegistrationNum}, OrderId ${fileDetails.orderId}, ` +
+      `and ReturnFile ${fileDetails.returnFileName}`
+    );
+
+    return fileDetails;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // BNS COMM NF Term 99 Happy Path
+  // ─────────────────────────────────────────────────────────────────────────────
+  async runBnsCommNfTerm99HappyPath(page: Page, scenarioId: string): Promise<FileDetails> {
+    const fileDetails = loadScenarioData(scenarioId);
+    fileDetails.sampleFile = path.resolve(process.cwd(), 'src', 'data', 'BNS_COMM', 'BNS_Comm_NF_Term99.xml');
+    fileDetails.scenarioId = scenarioId;
+
+    if (!fileDetails.inputFileDescription) {
+      throw new Error(
+        `InputFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the UniqueId.`
+      );
+    }
+
+    await fileSystem.createBnsCommNfXml(fileDetails);
+
+    const db = new DbService();
+    fileDetails.batchType = 'NF';
+    await db.setProcessAndFileStatusToNotStarted(fileDetails);
+    const hangfirePage = new HangfireJobsPage(page);
+    await hangfirePage.goToProcessHFJobs(db, fileDetails);
+    await db.validateHandshakeJobStatus(fileDetails);
+    console.log('Handshake job status validated in DB for BNS COMM NF Term 99');
+
+    const manualProcessingService = new ManualProcessingService();
+    const manualResponse = await manualProcessingService.processManualTransaction(fileDetails, 'BC', 'superuser');
+    console.log('Manual Processing API response:', manualResponse);
+
+    const downloadPage = new DownloadPage(page);
+    const downloadDir = process.env.PW_DOWNLOADS_DIR || path.resolve(process.cwd(), 'downloads');
+    const testName = scenarioId;
+
+    if (!fileDetails.returnFileDescription) {
+      throw new Error(
+        `ReturnFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the Return UniqueId.`
+      );
+    }
+    fileDetails.downloadFileType = 'ReturnFile';
+    await this.downloadAndValidateReturnFileWithRetry(
+      page,
+      db,
+      hangfirePage,
+      downloadPage,
+      fileDetails,
+      downloadDir,
+      testName
+    );
+
+    console.log(
+      `BNS COMM NF Term 99 file processed with Batchnumber ${fileDetails.batchNumber}, ` +
+      `filename ${fileDetails.inputFileName}, PartnerReference ${fileDetails.partnerReference}, ` +
+      `RegistrationNumber ${fileDetails.baseRegistrationNum}, OrderId ${fileDetails.orderId}, ` +
+      `and ReturnFile ${fileDetails.returnFileName}`
+    );
+
+    return fileDetails;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // BNS COMM NF Invalid Transit Number (Negative Test)
+  // ─────────────────────────────────────────────────────────────────────────────
+  async runBnsCommNfInvalidTransitNumber(page: Page, scenarioId: string): Promise<FileDetails> {
+    const fileDetails = loadScenarioData(scenarioId);
+    fileDetails.sampleFile = path.resolve(process.cwd(), 'src', 'data', 'BNS_COMM', 'BNS_Comm_NF_Invalid.xml');
+    fileDetails.scenarioId = scenarioId;
+
+    if (!fileDetails.inputFileDescription) {
+      throw new Error(
+        `InputFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the UniqueId.`
+      );
+    }
+
+    await fileSystem.createBnsCommNfXml(fileDetails);
+
+    const db = new DbService();
+    fileDetails.batchType = 'NF';
+    await db.setProcessAndFileStatusToNotStarted(fileDetails);
+    const hangfirePage = new HangfireJobsPage(page);
+    await hangfirePage.goToProcessHFJobs(db, fileDetails);
+    await db.validateHandshakeNotImported(fileDetails);
+    console.log('Handshake validation confirmed file was NotImported as expected for BNS COMM NF Invalid Transit Number');
+
+    console.log(
+      `BNS COMM NF Invalid Transit Number file rejected as expected with Batchnumber ${fileDetails.batchNumber}, ` +
+      `filename ${fileDetails.inputFileName}`
+    );
+
+    return fileDetails;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
   // BNS COMM Amendment Happy Path
   // ─────────────────────────────────────────────────────────────────────────────
   async runBnsCommAmendmentHappyPath(

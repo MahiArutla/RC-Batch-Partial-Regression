@@ -15,7 +15,7 @@ export function generatePartnerReference(): string {
 }
 
 export function generateA8DigitReference(): string {
-  return `Smoke${randomInt(10_000_000, 99_999_999)}`;
+  return `FullReg${randomInt(10_000_000, 99_999_999)}`;
 }
 
 export function generateBmoInputFileName(): string {

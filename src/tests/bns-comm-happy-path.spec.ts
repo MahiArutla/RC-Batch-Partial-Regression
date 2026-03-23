@@ -152,6 +152,95 @@ test.describe('BNS COMM Happy Path Tests', () => {
     });
   });
 
+  test('BNS_COMM_NF_QC', async ({ page, loginPage }) => {
+    const env = loadEnv();
+    await test.step('Login to web app', async () => {
+      await loginPage.goto(env.webAppUrl);
+      await loginPage.login(env.adminUser, env.adminPassword);
+    });
+    console.log('Logged into web application');
+
+    const orchestrator = new Orchestrator();
+    const scenarioId = 'BNS_COMM_NF_QC';
+
+    const fileDetails = await test.step('Run BNS COMM NF QC', async () => {
+      return orchestrator.runBnsCommNfQcHappyPath(page, scenarioId);
+    });
+
+    await test.step('Validate NF QC file processing completed', async () => {
+      expect(fileDetails.uniqueId).toBeTruthy();
+      expect(fileDetails.partnerReference).toBeTruthy();
+      expect(fileDetails.baseRegistrationNum).toBeTruthy();
+      expect(fileDetails.batchNumber).toBeTruthy();
+      expect(fileDetails.orderId).toBeTruthy();
+      expect(fileDetails.returnFileName).toBeTruthy();
+      console.log(`✓ BNS COMM NF QC file processed successfully`);
+      console.log(`  File: ${fileDetails.inputFileName}`);
+      console.log(`  Partner Reference: ${fileDetails.partnerReference}`);
+      console.log(`  Registration Number: ${fileDetails.baseRegistrationNum}`);
+      console.log(`  Batch Number: ${fileDetails.batchNumber}`);
+      console.log(`  Order ID: ${fileDetails.orderId}`);
+      console.log(`  Return File: ${fileDetails.returnFileName}`);
+    });
+  });
+
+  test('BNS_COMM_NF_Term99', async ({ page, loginPage }) => {
+    const env = loadEnv();
+    await test.step('Login to web app', async () => {
+      await loginPage.goto(env.webAppUrl);
+      await loginPage.login(env.adminUser, env.adminPassword);
+    });
+    console.log('Logged into web application');
+
+    const orchestrator = new Orchestrator();
+    const scenarioId = 'BNS_COMM_NF_Term99';
+
+    const fileDetails = await test.step('Run BNS COMM NF Term 99', async () => {
+      return orchestrator.runBnsCommNfTerm99HappyPath(page, scenarioId);
+    });
+
+    await test.step('Validate NF Term 99 file processing completed', async () => {
+      expect(fileDetails.uniqueId).toBeTruthy();
+      expect(fileDetails.partnerReference).toBeTruthy();
+      expect(fileDetails.baseRegistrationNum).toBeTruthy();
+      expect(fileDetails.batchNumber).toBeTruthy();
+      expect(fileDetails.orderId).toBeTruthy();
+      expect(fileDetails.returnFileName).toBeTruthy();
+      console.log(`✓ BNS COMM NF Term 99 file processed successfully`);
+      console.log(`  File: ${fileDetails.inputFileName}`);
+      console.log(`  Partner Reference: ${fileDetails.partnerReference}`);
+      console.log(`  Registration Number: ${fileDetails.baseRegistrationNum}`);
+      console.log(`  Batch Number: ${fileDetails.batchNumber}`);
+      console.log(`  Order ID: ${fileDetails.orderId}`);
+      console.log(`  Return File: ${fileDetails.returnFileName}`);
+    });
+  });
+
+  test('BNS_COMM_NF_Invalid_TransitNumber', async ({ page, loginPage }) => {
+    const env = loadEnv();
+    await test.step('Login to web app', async () => {
+      await loginPage.goto(env.webAppUrl);
+      await loginPage.login(env.adminUser, env.adminPassword);
+    });
+    console.log('Logged into web application');
+
+    const orchestrator = new Orchestrator();
+    const scenarioId = 'BNS_COMM_NF_Invalid_TransitNumber';
+
+    const fileDetails = await test.step('Run BNS COMM NF Invalid Transit Number', async () => {
+      return orchestrator.runBnsCommNfInvalidTransitNumber(page, scenarioId);
+    });
+
+    await test.step('Validate file was not imported as expected', async () => {
+      expect(fileDetails.uniqueId).toBeTruthy();
+      expect(fileDetails.batchNumber).toBeTruthy();
+      console.log(`✓ BNS COMM NF Invalid Transit Number file rejected as expected`);
+      console.log(`  File: ${fileDetails.inputFileName}`);
+      console.log(`  Batch Number: ${fileDetails.batchNumber}`);
+      console.log(`  Status: NotImported (validation failed)`);
+    });
+  });
+
   test.setTimeout(600000); // 10 minutes
   test('BNS COMM NF -> Amendment -> Renewal -> Discharge', async ({ page, loginPage }) => {
     test.setTimeout(20 * 60 * 1000); // 20 minutes for full end-to-end flow

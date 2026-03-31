@@ -4,16 +4,55 @@ import { readFileSync, writeFileSync } from 'fs';
 import { loadEnv } from '../config/env';
 import { FileDetails } from '../models/fileDetails';
 import { generateA8DigitReference, generateBatchNumber, generateBmoInputFileName, generateFordReference, generateTdafReference, generateVwReference, generateVin } from './random';
+import { ensureSftpDirectory, uploadFileToSftp, clearSftpDirectory, listSftpDirectory } from './sftpClient';
 
 const env = loadEnv();
 
 export async function ensureDirectory(targetDir: string): Promise<void> {
-  await fs.mkdir(targetDir, { recursive: true });
+  if (isRemotePath(targetDir)) {
+    await ensureSftpDirectory(targetDir);
+  } else {
+    await fs.mkdir(targetDir, { recursive: true });
+  }
+}
+
+function isRemotePath(targetPath: string): boolean {
+  const normalizedPath = targetPath.replace(/\\/g, '/');
+
+  // Check if path starts with /Usr/ (legacy)
+  if (normalizedPath.startsWith('/Usr/')) {
+    return true;
+  }
+
+  // If sftpRoot is configured and not empty, check if path includes it
+  const normalizedSftpRoot = env.sftpRoot.replace(/\\/g, '/');
+  if (normalizedSftpRoot && normalizedPath.includes(normalizedSftpRoot)) {
+    return true;
+  }
+
+  // Check if path matches known SFTP directory patterns
+  const sftpPatterns = [
+    /^BNSCommercial\//,
+    /^ford\//,
+    /^tdaf\//,
+    /^GMFCLCR\//,
+    /^BMO\//,
+    /^GBC\//,
+    /^CLEARCHARGE\//,
+    /^VW\//
+  ];
+
+  return sftpPatterns.some(pattern => pattern.test(normalizedPath));
 }
 
 export async function copyFile(source: string, destination: string): Promise<void> {
-  await ensureDirectory(path.dirname(destination));
-  await fs.copyFile(source, destination);
+  if (isRemotePath(destination)) {
+    const remotePath = destination.replace(/\\/g, '/');
+    await uploadFileToSftp(source, remotePath);
+  } else {
+    await ensureDirectory(path.dirname(destination));
+    await fs.copyFile(source, destination);
+  }
 }
 
 export async function updateBatchNumberInTildeFile(filePath: string, batchNumber: string): Promise<void> {
@@ -116,14 +155,19 @@ export async function updateSerialNumberInXifFile(filePath: string, serialNumber
 
 export async function clearDirectory(targetDir: string): Promise<void> {
   try {
-    const entries = await fs.readdir(targetDir, { withFileTypes: true });
-    await Promise.all(
-      entries.map(async (entry) => {
-        if (!entry.isFile()) return;
-        const filePath = path.join(targetDir, entry.name);
-        await fs.unlink(filePath);
-      })
-    );
+    if (isRemotePath(targetDir)) {
+      const remotePath = targetDir.replace(/\\/g, '/');
+      await clearSftpDirectory(remotePath);
+    } else {
+      const entries = await fs.readdir(targetDir, { withFileTypes: true });
+      await Promise.all(
+        entries.map(async (entry) => {
+          if (!entry.isFile()) return;
+          const filePath = path.join(targetDir, entry.name);
+          await fs.unlink(filePath);
+        })
+      );
+    }
   } catch {
     // Ignore errors (e.g., directory does not exist); caller may create it
   }
@@ -465,18 +509,19 @@ function buildGmfcrFileName(): string {
 }
 
 function buildSftpTarget(fileInfo: string, fileName: string): string {
+  const sftpRoot = env.sftpRoot.replace(/\\/g, '/');
   switch (fileInfo.toUpperCase()) {
     case 'GBC':
-      return path.join(env.sftpRoot, 'GBC', 'in', fileName);
+      return path.posix.join(sftpRoot, 'GBC', 'in', fileName);
     case 'BMO':
-      return path.join(env.sftpRoot, 'BMO', 'in', fileName);
+      return path.posix.join(sftpRoot, 'BMO', 'in', fileName);
     case 'CLEARCHARGE':
-      return path.join(env.sftpRoot, 'CLEARCHARGE', 'in', fileName);
+      return path.posix.join(sftpRoot, 'CLEARCHARGE', 'in', fileName);
     case 'TDAF':
-      return path.join(env.sftpRoot, 'tdaf', 'in', fileName);
+      return path.posix.join(sftpRoot, 'tdaf', 'in', fileName);
     case 'VW':
     case 'VOLKSWAGEN':
-      return path.join(env.sftpRoot, 'VW', 'in', fileName);
+      return path.posix.join(sftpRoot, 'VW', 'in', fileName);
     default:
       throw new Error(`Client Format not found for ${fileInfo}`);
   }
@@ -491,7 +536,8 @@ function buildSftpPathForClient(client: string, fileName: string): string {
   if (!clientFolder) {
     throw new Error(`SFTP folder mapping is missing for client ${client}.`);
   }
-  return path.join(env.sftpRoot, clientFolder, fileName);
+  const sftpRoot = env.sftpRoot.replace(/\\/g, '/');
+  return path.posix.join(sftpRoot, clientFolder, fileName);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -622,7 +668,8 @@ export async function createFordNfFc(fileDetails: FileDetails): Promise<void> {
 
   fileDetails.inputFileName = inputFileName;
 
-  const targetPath = path.join(env.sftpRoot, 'ford', 'in', inputFileName);
+  const sftpRoot = env.sftpRoot.replace(/\\/g, '/');
+  const targetPath = path.posix.join(sftpRoot, 'ford', 'in', inputFileName);
   const targetDir = path.dirname(targetPath);
   await ensureDirectory(targetDir);
   await clearDirectory(targetDir);
@@ -647,7 +694,8 @@ export async function createBnsCommNfXml(fileDetails: FileDetails): Promise<void
 
   fileDetails.inputFileName = inputFileName;
 
-  const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', inputFileName);
+  const sftpRoot = env.sftpRoot.replace(/\\/g, '/');
+  const targetPath = path.posix.join(sftpRoot, 'BNSCommercial', 'BNSXML', inputFileName);
   const targetDir = path.dirname(targetPath);
   await ensureDirectory(targetDir);
   await clearDirectory(targetDir);
@@ -693,8 +741,9 @@ export async function createBnsCommDischargeXml(fileDetails: FileDetails): Promi
   fileDetails.sampleFile = dischargeLocalFilePath;
   fileDetails.batchNumber = newBatchNumber;
   fileDetails.inputFileName = dischargeInputFileName;
-  
-  const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', dischargeInputFileName);
+
+  const sftpRoot = env.sftpRoot.replace(/\\/g, '/');
+  const targetPath = path.posix.join(sftpRoot, 'BNSCommercial', 'BNSXML', dischargeInputFileName);
   const targetDir = path.dirname(targetPath);
   await ensureDirectory(targetDir);
   await clearDirectory(targetDir);
@@ -741,7 +790,8 @@ export async function createBnsCommAmendmentXml(fileDetails: FileDetails): Promi
   fileDetails.batchNumber = newBatchNumber;
   fileDetails.inputFileName = amendmentInputFileName;
 
-  const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', amendmentInputFileName);
+  const sftpRoot = env.sftpRoot.replace(/\\/g, '/');
+  const targetPath = path.posix.join(sftpRoot, 'BNSCommercial', 'BNSXML', amendmentInputFileName);
   const targetDir = path.dirname(targetPath);
   await ensureDirectory(targetDir);
   await clearDirectory(targetDir);
@@ -828,9 +878,10 @@ export async function createChangeOfProvinceFile(fileDetails: FileDetails): Prom
 }
 
 export async function verifyTdafHandshakeFileExists(fileDetails: FileDetails): Promise<string> {
-  const handshakeDir = path.join(env.sftpRoot, 'tdaf', 'handshake');
+  const sftpRoot = env.sftpRoot.replace(/\\/g, '/');
+  const handshakeDir = path.posix.join(sftpRoot, 'tdaf', 'handshake');
 
-  const files = await fs.readdir(handshakeDir);
+  const files = await listSftpDirectory(handshakeDir);
 
   const handshakePattern = /^Fiserv_HandShake_Batch_.*\.csv$/i;
   const matchingFiles = files.filter(f => handshakePattern.test(f));
@@ -843,12 +894,7 @@ export async function verifyTdafHandshakeFileExists(fileDetails: FileDetails): P
   }
 
   const latestFile = matchingFiles.sort().reverse()[0];
-  const fullPath = path.join(handshakeDir, latestFile);
-
-  const exists = await pathExists(fullPath);
-  if (!exists) {
-    throw new Error(`Handshake file not found: ${fullPath}`);
-  }
+  const fullPath = path.posix.join(handshakeDir, latestFile);
 
   console.log(`✓ Handshake file verified: ${latestFile}`);
   return fullPath;
@@ -864,7 +910,8 @@ export async function createGreenlightDischargeFile(fileDetails: FileDetails): P
 
   await updateGreenlightDischargeFile(sourceFilePath, fileDetails);
 
-  const targetPath = path.join(env.sftpRoot, 'tdaf', 'in', inputFileName);
+  const sftpRoot = env.sftpRoot.replace(/\\/g, '/');
+  const targetPath = path.posix.join(sftpRoot, 'tdaf', 'in', inputFileName);
   const targetDir = path.dirname(targetPath);
   await ensureDirectory(targetDir);
   await clearDirectory(targetDir);
@@ -952,7 +999,8 @@ export async function createBnsCommExternalFile(fileDetails: FileDetails): Promi
 
   await updateBnsCommExternalFile(sourceFilePath, fileDetails);
 
-  const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', inputFileName);
+  const sftpRoot = env.sftpRoot.replace(/\\/g, '/');
+  const targetPath = path.posix.join(sftpRoot, 'BNSCommercial', 'BNSXML', inputFileName);
   const targetDir = path.dirname(targetPath);
   await ensureDirectory(targetDir);
   await clearDirectory(targetDir);
@@ -997,7 +1045,8 @@ export async function createBnsCommSearchFile(fileDetails: FileDetails): Promise
 
   await updateBnsCommSearchFile(sourceFilePath, fileDetails);
 
-  const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', inputFileName);
+  const sftpRoot = env.sftpRoot.replace(/\\/g, '/');
+  const targetPath = path.posix.join(sftpRoot, 'BNSCommercial', 'BNSXML', inputFileName);
   const targetDir = path.dirname(targetPath);
   await ensureDirectory(targetDir);
   await clearDirectory(targetDir);
@@ -1040,7 +1089,8 @@ export async function createBnsCommLookupFile(fileDetails: FileDetails): Promise
 
   await updateBnsCommLookupFile(sourceFilePath, fileDetails);
 
-  const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', inputFileName);
+  const sftpRoot = env.sftpRoot.replace(/\\/g, '/');
+  const targetPath = path.posix.join(sftpRoot, 'BNSCommercial', 'BNSXML', inputFileName);
   const targetDir = path.dirname(targetPath);
   await ensureDirectory(targetDir);
   await clearDirectory(targetDir);
@@ -1072,7 +1122,8 @@ export async function createGmfclNfFile(fileDetails: FileDetails): Promise<void>
 
   await updateGmfclFile(sourceFilePath, fileDetails);
 
-  const targetPath = path.join(env.sftpRoot, 'GMFCLCR', 'in', inputFileName);
+  const sftpRoot = env.sftpRoot.replace(/\\/g, '/');
+  const targetPath = path.posix.join(sftpRoot, 'GMFCLCR', 'in', inputFileName);
   const targetDir = path.dirname(targetPath);
   await ensureDirectory(targetDir);
   await clearDirectory(targetDir);
@@ -1107,7 +1158,8 @@ export async function createGmfcrNfFile(fileDetails: FileDetails): Promise<void>
 
   await updateGmfcrFile(sourceFilePath, fileDetails);
 
-  const targetPath = path.join(env.sftpRoot, 'GMFCLCR', 'in', inputFileName);
+  const sftpRoot = env.sftpRoot.replace(/\\/g, '/');
+  const targetPath = path.posix.join(sftpRoot, 'GMFCLCR', 'in', inputFileName);
   const targetDir = path.dirname(targetPath);
   await ensureDirectory(targetDir);
   await clearDirectory(targetDir);

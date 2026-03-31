@@ -14,6 +14,7 @@ export default defineConfig({
   outputDir: path.join(__dirname, 'test-results'),
   reporter: [['list'], ['html', { open: 'never' }]],
   globalSetup: './src/global-setup.ts',
+  globalTeardown: './src/global-teardown.ts',
   use: {
     baseURL: env.webAppUrl,
     headless: true,

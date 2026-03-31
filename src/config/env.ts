@@ -12,6 +12,10 @@ export interface EnvConfig {
   downloadDirectory: string;
   cgeApiBaseUrl: string;
   cgeApiUser: string;
+  sftpHost: string;
+  sftpPort: number;
+  sftpUsername: string;
+  sftpPassword: string;
 }
 
 export function loadEnv(): EnvConfig {
@@ -26,10 +30,14 @@ export function loadEnv(): EnvConfig {
     adminUser: process.env.ADMIN_USER ?? 'RCBATCHAUTOUSER@trader.ca',
     adminPassword: process.env.ADMIN_PASSWORD ?? 'Password1!',
     dbConnectionString: process.env.DB_CONNECTION_STRING ?? 'Server=MRKREGDBVWQA43.DHLTD.CORP,1558;Database=CGE_MIDDLEWARE_QA;User Id=MWQAUser;Password=G8n!Zp4Qv2@Hk7Lm;Encrypt=true;TrustServerCertificate=true;',
-    sftpRoot: process.env.SFTP_ROOT ?? '\\\\cms_uat_ftp_non_pci.dhltd.corp\\cms_uat_ftp_non_pci\\CMSUATNONPCI\\Usr\\cgecd_qa2',
+    sftpRoot: process.env.SFTP_ROOT ?? '',
     downloadDirectory: process.env.DOWNLOAD_DIRECTORY ?? path.resolve(process.cwd(), 'downloads'),
     cgeApiBaseUrl: process.env.CGE_API_BASE_URL ?? 'http://aqa1publicapiwebsvcs.cge.dhltd.corp',
-    cgeApiUser: process.env.CGE_API_USER ?? 'superuser'
+    cgeApiUser: process.env.CGE_API_USER ?? 'superuser',
+    sftpHost: process.env.SFTP_HOST ?? 'uatcmsnonpci.trader.ca',
+    sftpPort: parseInt(process.env.SFTP_PORT ?? '22', 10),
+    sftpUsername: process.env.SFTP_USERNAME ?? 'cgecd_qa2',
+    sftpPassword: process.env.SFTP_PASSWORD ?? '4f9KLl6lZgjgiIq'
   };
 
   return cachedEnv;

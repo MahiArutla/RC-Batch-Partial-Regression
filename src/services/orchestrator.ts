@@ -112,10 +112,10 @@ export class Orchestrator {
 
     await fileSystem.createRenewalFile(fileDetails);
 
-    if (!fileDetails.inputFileDescription) {
+    if (!fileDetails.renewalFileDescription) {
       throw new Error(
-        `InputFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
-        `Please add it so DB can resolve the NF UniqueId.`
+        `RenewalFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the Renewal UniqueId.`
       );
     }
 
@@ -180,10 +180,10 @@ export class Orchestrator {
 
     await fileSystem.createDischargeFile(fileDetails);
 
-    if (!fileDetails.inputFileDescription) {
+    if (!fileDetails.dischargeFileDescription) {
       throw new Error(
-        `InputFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
-        `Please add it so DB can resolve the NF UniqueId.`
+        `DischargeFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the Discharge UniqueId.`
       );
     }
 
@@ -261,10 +261,10 @@ export class Orchestrator {
 
     await fileSystem.createChangeOfProvinceFile(fileDetails);
 
-    if (!fileDetails.inputFileDescription) {
+    if (!fileDetails.copFileDescription) {
       throw new Error(
-        `InputFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
-        `Please add it so DB can resolve the NF UniqueId.`
+        `CopFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the Change of Province UniqueId.`
       );
     }
 

@@ -11,10 +11,12 @@
   },
   "dependencies": {
     "@types/node-fetch": "^2.6.13",
+    "@types/ssh2-sftp-client": "^9.0.6",
     "axios": "^1.7.7",
     "dotenv": "^16.4.5",
     "mssql": "^10.0.2",
     "node-fetch": "^2.7.0",
+    "ssh2-sftp-client": "^12.1.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

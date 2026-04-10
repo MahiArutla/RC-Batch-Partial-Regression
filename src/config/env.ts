@@ -12,6 +12,10 @@ export interface EnvConfig {
   downloadDirectory: string;
   cgeApiBaseUrl: string;
   cgeApiUser: string;
+  sftpHost: string;
+  sftpPort: number;
+  sftpUsername: string;
+  sftpPassword: string;
 }
 
 export function loadEnv(): EnvConfig {
@@ -29,7 +33,11 @@ export function loadEnv(): EnvConfig {
     sftpRoot: process.env.SFTP_ROOT ?? '\\\\cms_uat_ftp_non_pci.dhltd.corp\\cms_uat_ftp_non_pci\\CMSUATNONPCI\\Usr\\cgecd_qa2',
     downloadDirectory: process.env.DOWNLOAD_DIRECTORY ?? path.resolve(process.cwd(), 'downloads'),
     cgeApiBaseUrl: process.env.CGE_API_BASE_URL ?? 'http://aqa1publicapiwebsvcs.cge.dhltd.corp',
-    cgeApiUser: process.env.CGE_API_USER ?? 'superuser'
+    cgeApiUser: process.env.CGE_API_USER ?? 'superuser',
+    sftpHost: process.env.SFTP_HOST ?? 'uatcmsnonpci.trader.ca',
+    sftpPort: Number(process.env.SFTP_PORT) || 22,
+    sftpUsername: process.env.SFTP_USERNAME ?? 'cgecd_qa2',
+    sftpPassword: process.env.SFTP_PASSWORD ?? '4f9KLl6lZgjgiIq'
   };
 
   return cachedEnv;

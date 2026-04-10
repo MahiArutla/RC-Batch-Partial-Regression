@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Xif-Document Version="1.0" Database="ONGLTS9" Direction="Import">
+	<Batch Number="12331">
+		<Date Format="yyyy-MM-dd">2020-07-17</Date>
+	</Batch>
+	<Registration-List>
+		<Registration Type="New">
+			<Partner-Reference>202416105</Partner-Reference>
+			<PPR Province="QC"/>
+			<Contract>
+				<Date Format="yyyy-MM-dd">2018-11-22</Date>
+				<QC.Location>
+					<City>TROIS-RIVIERES</City>
+					<Province>QC</Province>
+				</QC.Location>
+				<Type>Retail</Type>
+				<Term Unit="Month"/>
+				<Amount>35452.44</Amount>
+				<Expiry-Date Format="yyyy-MM-dd">2027-11-22</Expiry-Date>
+				<Maturity-Date Format="yyyy-MM-dd">2027-11-13</Maturity-Date>
+			</Contract>
+			<Party-List>
+				<Party Type="Debtor-Individual">
+					<First-Name>Jonathan</First-Name>
+					<Middle-Name/>
+					<Last-Name>Bernard</Last-Name>
+					<Birth-Date Format="yyyy-MM-dd">1985-04-15</Birth-Date>
+					<Address>
+						<Street>990 RUE DE MEZY APT 6</Street>
+						<City>TROIS RIVIERES</City>
+						<Province>QC</Province>
+						<Postal-Code>G8T 7E7</Postal-Code>
+					</Address>
+					<Sync-Id>1</Sync-Id>
+					<ON.Notify-Language>French</ON.Notify-Language>
+				</Party>
+				<Party Type="Dealer">
+					<Identifier>0000013064</Identifier>
+					<Name>HYUNDAI TROIS RIVIERES/ LES AUTOS YOMO INC</Name>
+					<Address>
+						<Street>5225 BOUL JEAN XXIII</Street>
+						<City>TROIS-RIVIERES</City>
+						<Province>QC</Province>
+						<Postal-Code>G8Z 4A5</Postal-Code>
+					</Address>
+				</Party>
+			</Party-List>
+			<Collaterals>
+				<Collateral Type="Serial" Condition="New">
+					<Serial-Number>KMHC75LC7KU115195</Serial-Number>
+					<Make>Hyundai</Make>
+					<Model>Ioniq</Model>
+					<Year>2019</Year>
+					<Category>Passenger Vehicle</Category>
+				</Collateral>
+			</Collaterals>
+		</Registration>
+	</Registration-List>
+</Xif-Document>

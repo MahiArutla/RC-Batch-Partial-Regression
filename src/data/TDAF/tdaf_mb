@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Xif-Document Version="1.0" Database="ONGLTS9" Direction="Import">
+	<Batch Number="12331">
+		<Date Format="yyyy-MM-dd">2020-07-17</Date>
+	</Batch>
+	<Registration-List>
+		<Registration Type="New">
+			<Partner-Reference>202416103</Partner-Reference>
+			<PPR Province="MB"/>
+			<Contract>
+				<Date Format="yyyy-MM-dd">2018-11-26</Date>
+				<Type>Retail</Type>
+				<Term Unit="Month"/>
+				<Amount>15136.45</Amount>
+				<Expiry-Date Format="yyyy-MM-dd">2023-11-26</Expiry-Date>
+				<Maturity-Date Format="yyyy-MM-dd">2023-11-22</Maturity-Date>
+			</Contract>
+			<Party-List>
+				<Party Type="Debtor-Individual">
+					<First-Name>RON</First-Name>
+					<Middle-Name></Middle-Name>
+					<Last-Name>BUSCHNER</Last-Name>
+					<Birth-Date Format="yyyy-MM-dd">1957-03-10</Birth-Date>
+					<Address>
+						<Street>12 ROSSER AVENUE</Street>
+						<City>BRANDON</City>
+						<Province>MB</Province>
+						<Postal-Code>R7A 7P9</Postal-Code>
+					</Address>
+					<Sync-Id>1</Sync-Id>
+					<ON.Notify-Language>English</ON.Notify-Language>
+				</Party>
+			</Party-List>
+			<Collaterals>
+				<Collateral Type="Serial" Condition="New">
+					<Serial-Number>2B3KA43R86H389824</Serial-Number>
+					<Make>BMW</Make>
+					<Model>5 Series</Model>
+					<Year>2006</Year>
+					<Category>Motor Vehicle</Category>
+				</Collateral>
+			</Collaterals>
+		</Registration>
+		</Registration-List>
+</Xif-Document>

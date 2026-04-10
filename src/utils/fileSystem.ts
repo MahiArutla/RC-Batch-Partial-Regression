@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync } from 'fs';
 import { loadEnv } from '../config/env';
 import { FileDetails } from '../models/fileDetails';
 import { generateA8DigitReference, generateBatchNumber, generateBmoInputFileName, generateFordReference, generateTdafReference, generateVwReference, generateVin } from './random';
+import { getSftpClient } from './sftp';
 
 const env = loadEnv();
 
@@ -14,6 +15,19 @@ export async function ensureDirectory(targetDir: string): Promise<void> {
 export async function copyFile(source: string, destination: string): Promise<void> {
   await ensureDirectory(path.dirname(destination));
   await fs.copyFile(source, destination);
+}
+
+export async function uploadToSftp(localPath: string, remoteRelativePath: string): Promise<void> {
+  const sftp = getSftpClient();
+  // Convert Windows path separators to Unix-style for SFTP
+  const remotePath = remoteRelativePath.replace(/\\/g, '/');
+  await sftp.uploadFile(localPath, remotePath);
+}
+
+export async function clearSftpDirectory(remoteRelativePath: string): Promise<void> {
+  const sftp = getSftpClient();
+  const remotePath = remoteRelativePath.replace(/\\/g, '/');
+  await sftp.clearRemoteDirectory(remotePath);
 }
 
 export async function updateBatchNumberInTildeFile(filePath: string, batchNumber: string): Promise<void> {
@@ -500,6 +514,24 @@ function buildSftpTarget(fileInfo: string, fileName: string): string {
   }
 }
 
+function buildSftpRemotePath(fileInfo: string, fileName: string): string {
+  switch (fileInfo.toUpperCase()) {
+    case 'GBC':
+      return `/GBC/in/${fileName}`;
+    case 'BMO':
+      return `/BMO/in/${fileName}`;
+    case 'CLEARCHARGE':
+      return `/CLEARCHARGE/in/${fileName}`;
+    case 'TDAF':
+      return `/tdaf/in/${fileName}`;
+    case 'VW':
+    case 'VOLKSWAGEN':
+      return `/VW/in/${fileName}`;
+    default:
+      throw new Error(`Client Format not found for ${fileInfo}`);
+  }
+}
+
 const sftpFolderByClient: Record<string, string> = {
   BMO: path.join('BMO', 'in'),
   GBC: path.join('gbc', 'in')
@@ -511,6 +543,17 @@ function buildSftpPathForClient(client: string, fileName: string): string {
     throw new Error(`SFTP folder mapping is missing for client ${client}.`);
   }
   return path.join(env.sftpRoot, clientFolder, fileName);
+}
+
+function buildSftpRemotePathForClient(client: string, fileName: string): string {
+  const clientUpper = client.toUpperCase();
+  if (clientUpper === 'BMO') {
+    return `/BMO/in/${fileName}`;
+  }
+  if (clientUpper === 'GBC') {
+    return `/gbc/in/${fileName}`;
+  }
+  throw new Error(`SFTP folder mapping is missing for client ${client}.`);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -540,11 +583,10 @@ export async function updateNfFile(fileDetails: FileDetails): Promise<FileDetail
   }
 
   fileDetails.inputFileName = inputFileName;
-  const targetPath = buildSftpTarget(fileDetails.fileInfo, inputFileName);
-  const targetDir = path.dirname(targetPath);
-  await ensureDirectory(targetDir);
-  await clearDirectory(targetDir);
-  await copyFile(sourceFilePath, targetPath);
+  const remotePath = buildSftpRemotePath(fileDetails.fileInfo, inputFileName);
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  await clearSftpDirectory(remoteDir);
+  await uploadToSftp(sourceFilePath, remotePath);
   return fileDetails;
 }
 
@@ -563,8 +605,10 @@ export async function createNfFileTilde(fileDetails: FileDetails): Promise<void>
   await updateBatchNumberInTildeFile(localFilePath, fileDetails.batchNumber);
   await updateReferenceNumberInTildeFile(localFilePath, fileDetails.partnerReference);
 
-  const sftpTarget = buildSftpPathForClient(fileDetails.client, localFileName);
-  await copyFile(localFilePath, sftpTarget);
+  const remotePath = buildSftpRemotePathForClient(fileDetails.client, localFileName);
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  await clearSftpDirectory(remoteDir);
+  await uploadToSftp(localFilePath, remotePath);
 
   fileDetails.inputFileName = localFileName;
 }
@@ -609,11 +653,10 @@ export async function createClearChargeNfFile(fileDetails: FileDetails): Promise
   fileDetails.batchNumber = paddedBatch;
   fileDetails.inputFileName = inputFileName;
 
-  const targetPath = buildSftpTarget(fileDetails.fileInfo, inputFileName);
-  const targetDir = path.dirname(targetPath);
-  await ensureDirectory(targetDir);
-  await clearDirectory(targetDir);
-  await copyFile(sourceFilePath, targetPath);
+  const remotePath = buildSftpRemotePath(fileDetails.fileInfo, inputFileName);
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  await clearSftpDirectory(remoteDir);
+  await uploadToSftp(sourceFilePath, remotePath);
 }
 
 export async function createFordNfFc(fileDetails: FileDetails): Promise<void> {
@@ -641,11 +684,10 @@ export async function createFordNfFc(fileDetails: FileDetails): Promise<void> {
 
   fileDetails.inputFileName = inputFileName;
 
-  const targetPath = path.join(env.sftpRoot, 'ford', 'in', inputFileName);
-  const targetDir = path.dirname(targetPath);
-  await ensureDirectory(targetDir);
-  await clearDirectory(targetDir);
-  await copyFile(localFilePath, targetPath);
+  const remotePath = `/ford/in/${inputFileName}`;
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  await clearSftpDirectory(remoteDir);
+  await uploadToSftp(localFilePath, remotePath);
 }
 
 export async function createBnsCommNfXml(fileDetails: FileDetails): Promise<void> {
@@ -667,11 +709,10 @@ export async function createBnsCommNfXml(fileDetails: FileDetails): Promise<void
 
   fileDetails.inputFileName = inputFileName;
 
-  const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', inputFileName);
-  const targetDir = path.dirname(targetPath);
-  await ensureDirectory(targetDir);
-  await clearDirectory(targetDir);
-  await copyFile(localFilePath, targetPath);
+  const remotePath = `/BNSCommercial/BNSXML/${inputFileName}`;
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  await clearSftpDirectory(remoteDir);
+  await uploadToSftp(localFilePath, remotePath);
 }
 
 export async function createBnsCommNfXmlWithBatchNumber(fileDetails: FileDetails, batchNumber: string): Promise<void> {
@@ -695,14 +736,13 @@ export async function createBnsCommNfXmlWithBatchNumber(fileDetails: FileDetails
 
   fileDetails.inputFileName = inputFileName;
 
-  const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', inputFileName);
-  const targetDir = path.dirname(targetPath);
-  await ensureDirectory(targetDir);
-  await clearDirectory(targetDir);
-  await copyFile(localFilePath, targetPath);
+  const remotePath = `/BNSCommercial/BNSXML/${inputFileName}`;
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  await clearSftpDirectory(remoteDir);
+  await uploadToSftp(localFilePath, remotePath);
 
   console.log(`Created BNS COMM NF file with duplicate batch number: ${batchNumber}`);
-  console.log(`File uploaded to: ${targetPath}`);
+  console.log(`File uploaded to: ${remotePath}`);
 }
 
 export async function createBnsCommDischargeXml(fileDetails: FileDetails): Promise<void> {
@@ -745,11 +785,10 @@ export async function createBnsCommDischargeXml(fileDetails: FileDetails): Promi
   fileDetails.batchNumber = newBatchNumber;
   fileDetails.inputFileName = dischargeInputFileName;
 
-  const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', dischargeInputFileName);
-  const targetDir = path.dirname(targetPath);
-  await ensureDirectory(targetDir);
-  await clearDirectory(targetDir);
-  await copyFile(dischargeLocalFilePath, targetPath);
+  const remotePath = `/BNSCommercial/BNSXML/${dischargeInputFileName}`;
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  await clearSftpDirectory(remoteDir);
+  await uploadToSftp(dischargeLocalFilePath, remotePath);
 }
 
 export async function createBnsCommRenewalXmlWithBatchNumber(
@@ -792,14 +831,13 @@ export async function createBnsCommRenewalXmlWithBatchNumber(
 
   fileDetails.inputFileName = renewalInputFileName;
 
-  const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', renewalInputFileName);
-  const targetDir = path.dirname(targetPath);
-  await ensureDirectory(targetDir);
-  await clearDirectory(targetDir);
-  await copyFile(renewalLocalFilePath, targetPath);
+  const remotePath = `/BNSCommercial/BNSXML/${renewalInputFileName}`;
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  await clearSftpDirectory(remoteDir);
+  await uploadToSftp(renewalLocalFilePath, remotePath);
 
   console.log(`Created BNS COMM Renewal file with duplicate batch number: ${batchNumber}`);
-  console.log(`File uploaded to: ${targetPath}`);
+  console.log(`File uploaded to: ${remotePath}`);
 }
 
 export async function createBnsCommDischargeXmlWithBatchNumber(
@@ -842,14 +880,13 @@ export async function createBnsCommDischargeXmlWithBatchNumber(
 
   fileDetails.inputFileName = dischargeInputFileName;
 
-  const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', dischargeInputFileName);
-  const targetDir = path.dirname(targetPath);
-  await ensureDirectory(targetDir);
-  await clearDirectory(targetDir);
-  await copyFile(dischargeLocalFilePath, targetPath);
+  const remotePath = `/BNSCommercial/BNSXML/${dischargeInputFileName}`;
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  await clearSftpDirectory(remoteDir);
+  await uploadToSftp(dischargeLocalFilePath, remotePath);
 
   console.log(`Created BNS COMM Discharge file with duplicate batch number: ${batchNumber}`);
-  console.log(`File uploaded to: ${targetPath}`);
+  console.log(`File uploaded to: ${remotePath}`);
 }
 
 export async function createBnsCommAmendmentXml(fileDetails: FileDetails): Promise<void> {
@@ -892,11 +929,10 @@ export async function createBnsCommAmendmentXml(fileDetails: FileDetails): Promi
   fileDetails.batchNumber = newBatchNumber;
   fileDetails.inputFileName = amendmentInputFileName;
 
-  const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', amendmentInputFileName);
-  const targetDir = path.dirname(targetPath);
-  await ensureDirectory(targetDir);
-  await clearDirectory(targetDir);
-  await copyFile(amendmentLocalFilePath, targetPath);
+  const remotePath = `/BNSCommercial/BNSXML/${amendmentInputFileName}`;
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  await clearSftpDirectory(remoteDir);
+  await uploadToSftp(amendmentLocalFilePath, remotePath);
 }
 
 export async function createNfFileByClient(fileDetails: FileDetails): Promise<void> {
@@ -934,11 +970,10 @@ export async function createRenewalFile(fileDetails: FileDetails): Promise<void>
 
   await updateRenewalFile(sourceFilePath, fileDetails);
 
-  const targetPath = buildSftpTarget(fileDetails.fileInfo, inputFileName);
-  const targetDir = path.dirname(targetPath);
-  await ensureDirectory(targetDir);
-  await clearDirectory(targetDir);
-  await copyFile(sourceFilePath, targetPath);
+  const remotePath = buildSftpRemotePath(fileDetails.fileInfo, inputFileName);
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  await clearSftpDirectory(remoteDir);
+  await uploadToSftp(sourceFilePath, remotePath);
   fileDetails.inputFileName = inputFileName;
 }
 
@@ -952,11 +987,10 @@ export async function createDischargeFile(fileDetails: FileDetails): Promise<voi
 
   await updateDischargeFile(sourceFilePath, fileDetails);
 
-  const targetPath = buildSftpTarget(fileDetails.fileInfo, inputFileName);
-  const targetDir = path.dirname(targetPath);
-  await ensureDirectory(targetDir);
-  await clearDirectory(targetDir);
-  await copyFile(sourceFilePath, targetPath);
+  const remotePath = buildSftpRemotePath(fileDetails.fileInfo, inputFileName);
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  await clearSftpDirectory(remoteDir);
+  await uploadToSftp(sourceFilePath, remotePath);
   fileDetails.inputFileName = inputFileName;
 }
 
@@ -970,18 +1004,18 @@ export async function createChangeOfProvinceFile(fileDetails: FileDetails): Prom
 
   await updateChangeOfProvinceFile(sourceFilePath, fileDetails);
 
-  const targetPath = buildSftpTarget(fileDetails.fileInfo, inputFileName);
-  const targetDir = path.dirname(targetPath);
-  await ensureDirectory(targetDir);
-  await clearDirectory(targetDir);
-  await copyFile(sourceFilePath, targetPath);
+  const remotePath = buildSftpRemotePath(fileDetails.fileInfo, inputFileName);
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  await clearSftpDirectory(remoteDir);
+  await uploadToSftp(sourceFilePath, remotePath);
   fileDetails.inputFileName = inputFileName;
 }
 
 export async function verifyTdafHandshakeFileExists(fileDetails: FileDetails): Promise<string> {
-  const handshakeDir = path.join(env.sftpRoot, 'tdaf', 'handshake');
+  const sftp = getSftpClient();
+  const handshakeDir = '/tdaf/handshake';
 
-  const files = await fs.readdir(handshakeDir);
+  const files = await sftp.listFiles(handshakeDir);
 
   const handshakePattern = /^Fiserv_HandShake_Batch_.*\.csv$/i;
   const matchingFiles = files.filter(f => handshakePattern.test(f));
@@ -994,9 +1028,9 @@ export async function verifyTdafHandshakeFileExists(fileDetails: FileDetails): P
   }
 
   const latestFile = matchingFiles.sort().reverse()[0];
-  const fullPath = path.join(handshakeDir, latestFile);
+  const fullPath = `${handshakeDir}/${latestFile}`;
 
-  const exists = await pathExists(fullPath);
+  const exists = await sftp.fileExists(fullPath);
   if (!exists) {
     throw new Error(`Handshake file not found: ${fullPath}`);
   }
@@ -1015,11 +1049,10 @@ export async function createGreenlightDischargeFile(fileDetails: FileDetails): P
 
   await updateGreenlightDischargeFile(sourceFilePath, fileDetails);
 
-  const targetPath = path.join(env.sftpRoot, 'tdaf', 'in', inputFileName);
-  const targetDir = path.dirname(targetPath);
-  await ensureDirectory(targetDir);
-  await clearDirectory(targetDir);
-  await copyFile(sourceFilePath, targetPath);
+  const remotePath = `/tdaf/in/${inputFileName}`;
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  await clearSftpDirectory(remoteDir);
+  await uploadToSftp(sourceFilePath, remotePath);
   fileDetails.inputFileName = inputFileName;
 }
 
@@ -1069,7 +1102,10 @@ async function updateBnsCommExternalFile(filePath: string, fileDetails: FileDeta
   fileDetails.batchNumber = batchNumber;
 
   // Update Partner-Reference
-  content = content.replace(/BNS_COMM_RefNum/g, partnerRef);
+  content = content.replace(
+    /<Partner-Reference>[^<]*<\/Partner-Reference>/g,
+    `<Partner-Reference>${partnerRef}</Partner-Reference>`
+  );
 
   // Update Registration-Number inside PPR block (hardcoded value 240607B)
   content = content.replace(
@@ -1103,11 +1139,10 @@ export async function createBnsCommExternalFile(fileDetails: FileDetails): Promi
 
   await updateBnsCommExternalFile(sourceFilePath, fileDetails);
 
-  const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', inputFileName);
-  const targetDir = path.dirname(targetPath);
-  await ensureDirectory(targetDir);
-  await clearDirectory(targetDir);
-  await copyFile(sourceFilePath, targetPath);
+  const remotePath = `/BNSCommercial/BNSXML/${inputFileName}`;
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  await clearSftpDirectory(remoteDir);
+  await uploadToSftp(sourceFilePath, remotePath);
   fileDetails.inputFileName = inputFileName;
 }
 
@@ -1148,11 +1183,10 @@ export async function createBnsCommSearchFile(fileDetails: FileDetails): Promise
 
   await updateBnsCommSearchFile(sourceFilePath, fileDetails);
 
-  const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', inputFileName);
-  const targetDir = path.dirname(targetPath);
-  await ensureDirectory(targetDir);
-  await clearDirectory(targetDir);
-  await copyFile(sourceFilePath, targetPath);
+  const remotePath = `/BNSCommercial/BNSXML/${inputFileName}`;
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  await clearSftpDirectory(remoteDir);
+  await uploadToSftp(sourceFilePath, remotePath);
   fileDetails.inputFileName = inputFileName;
 }
 
@@ -1191,11 +1225,10 @@ export async function createBnsCommLookupFile(fileDetails: FileDetails): Promise
 
   await updateBnsCommLookupFile(sourceFilePath, fileDetails);
 
-  const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', inputFileName);
-  const targetDir = path.dirname(targetPath);
-  await ensureDirectory(targetDir);
-  await clearDirectory(targetDir);
-  await copyFile(sourceFilePath, targetPath);
+  const remotePath = `/BNSCommercial/BNSXML/${inputFileName}`;
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  await clearSftpDirectory(remoteDir);
+  await uploadToSftp(sourceFilePath, remotePath);
   fileDetails.inputFileName = inputFileName;
 }
 
@@ -1249,14 +1282,186 @@ startxref
   fileDetails.inputFileName = inputFileName;
   fileDetails.batchNumber = generateBatchNumber();
 
-  const targetPath = path.join(env.sftpRoot, 'BNSCommercial', 'BNSXML', inputFileName);
-  const targetDir = path.dirname(targetPath);
-  await ensureDirectory(targetDir);
-  await clearDirectory(targetDir);
-  await copyFile(sourceFilePath, targetPath);
+  const remotePath = `/BNSCommercial/BNSXML/${inputFileName}`;
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  await clearSftpDirectory(remoteDir);
+  await uploadToSftp(sourceFilePath, remotePath);
 
   console.log(`Created BNS COMM file with invalid type (.${fileExtension}): ${inputFileName}`);
-  console.log(`File uploaded to: ${targetPath}`);
+  console.log(`File uploaded to: ${remotePath}`);
+}
+
+export async function createTdafNfFileWithBatchNumber(fileDetails: FileDetails, batchNumber: string): Promise<void> {
+  const scenarioArtifactsDir = path.join(process.cwd(), 'artifacts', fileDetails.scenarioId);
+  await ensureDirectory(scenarioArtifactsDir);
+
+  // Format: TDC50toPPSA.{timestamp}.XIF
+  const inputFileName = buildNfFileName(fileDetails);
+  const localFilePath = path.join(scenarioArtifactsDir, inputFileName);
+  await copyFile(fileDetails.sampleFile, localFilePath);
+
+  // Use the provided batch number instead of generating a new one
+  fileDetails.batchNumber = batchNumber;
+
+  // Only generate partnerReference if not already set
+  if (!fileDetails.partnerReference) {
+    fileDetails.partnerReference = generateTdafReference();
+  }
+
+  await updateBatchNumberInXifFile(localFilePath, fileDetails.batchNumber);
+  await updatePartnerReferenceInXifFile(localFilePath, fileDetails.partnerReference);
+
+  fileDetails.inputFileName = inputFileName;
+
+  const remotePath = buildSftpRemotePath(fileDetails.fileInfo, inputFileName);
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  await clearSftpDirectory(remoteDir);
+  await uploadToSftp(localFilePath, remotePath);
+
+  console.log(`Created TDAF NF file with duplicate batch number: ${batchNumber}`);
+  console.log(`File uploaded to: ${remotePath}`);
+}
+
+export async function createTdafRenewalFileWithBatchNumber(
+  fileDetails: FileDetails,
+  batchNumber: string,
+  partnerReference: string
+): Promise<void> {
+  const scenarioArtifactsDir = path.join(process.cwd(), 'artifacts', fileDetails.scenarioId);
+  await ensureDirectory(scenarioArtifactsDir);
+
+  const inputFileName = buildRenewalFileName(fileDetails);
+  const sourceFilePath = path.join(scenarioArtifactsDir, inputFileName);
+  await copyFile(fileDetails.sampleFile, sourceFilePath);
+
+  // Set the partner reference from cycle 1
+  fileDetails.partnerReference = partnerReference;
+
+  // Read the file content
+  const content = await fs.readFile(sourceFilePath, 'utf-8');
+  const lines = content.split(/\r?\n/);
+
+  if (lines.length > 0) {
+    // For TDAF Renewal CSV format, the batch number is the entire first line
+    // Format: LON-TDAF2026-02-24 0834196046,,,,,,,,,,
+    // The batch number from NF cycle will be in same format but without the commas
+    // So we use the duplicate batch number and append the commas
+    lines[0] = `${batchNumber},,,,,,,,,,`;
+  }
+
+  // Update the partner reference in line 3 (index 2) if it exists
+  if (lines.length >= 3 && partnerReference) {
+    const cells = lines[2].split(',');
+    if (cells.length > 0) {
+      cells[0] = partnerReference;
+    }
+    lines[2] = cells.join(',');
+  }
+
+  await fs.writeFile(sourceFilePath, lines.join('\n'), 'utf-8');
+
+  // Set batch number on fileDetails (without commas for DB lookup)
+  fileDetails.batchNumber = batchNumber;
+
+  const remotePath = buildSftpRemotePath(fileDetails.fileInfo, inputFileName);
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  await clearSftpDirectory(remoteDir);
+  await uploadToSftp(sourceFilePath, remotePath);
+
+  fileDetails.inputFileName = inputFileName;
+
+  console.log(`Created TDAF Renewal file with duplicate batch number: ${batchNumber}`);
+  console.log(`File uploaded to: ${remotePath}`);
+}
+
+export async function createTdafDischargeFileWithBatchNumber(
+  fileDetails: FileDetails,
+  batchNumber: string,
+  partnerReference: string
+): Promise<void> {
+  const scenarioArtifactsDir = path.join(process.cwd(), 'artifacts', fileDetails.scenarioId);
+  await ensureDirectory(scenarioArtifactsDir);
+
+  const inputFileName = buildDischargeFileName(fileDetails);
+  const sourceFilePath = path.join(scenarioArtifactsDir, inputFileName);
+  await copyFile(fileDetails.sampleFile, sourceFilePath);
+
+  // Set values from cycle 1
+  fileDetails.partnerReference = partnerReference;
+
+  // Update the discharge file
+  await updateDischargeFile(sourceFilePath, fileDetails);
+
+  // Now override the batch number with the duplicate one
+  fileDetails.batchNumber = batchNumber;
+
+  // Update the first line to use duplicate batch number
+  const content = await fs.readFile(sourceFilePath, 'utf-8');
+  const lines = content.split(/\r?\n/);
+
+  if (lines.length > 0) {
+    // For TDAF Discharge, batch number is in first line
+    // Format: "0000LON-TDAF2026-02-26 02413499"
+    // We need to replace the entire line with the duplicate batch (prepended with 0000)
+    lines[0] = `0000${batchNumber}`;
+  }
+
+  await fs.writeFile(sourceFilePath, lines.join('\n'), 'utf-8');
+
+  const remotePath = buildSftpRemotePath(fileDetails.fileInfo, inputFileName);
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  await clearSftpDirectory(remoteDir);
+  await uploadToSftp(sourceFilePath, remotePath);
+
+  fileDetails.inputFileName = inputFileName;
+
+  console.log(`Created TDAF Discharge file with duplicate batch number: ${batchNumber}`);
+  console.log(`File uploaded to: ${remotePath}`);
+}
+
+export async function createTdafChangeOfProvinceFileWithBatchNumber(
+  fileDetails: FileDetails,
+  batchNumber: string,
+  partnerReference: string
+): Promise<void> {
+  const scenarioArtifactsDir = path.join(process.cwd(), 'artifacts', fileDetails.scenarioId);
+  await ensureDirectory(scenarioArtifactsDir);
+
+  const inputFileName = buildChangeOfProvinceFileName(fileDetails);
+  const sourceFilePath = path.join(scenarioArtifactsDir, inputFileName);
+  await copyFile(fileDetails.sampleFile, sourceFilePath);
+
+  // Set values from cycle 1
+  fileDetails.partnerReference = partnerReference;
+
+  // Update the change of province file
+  await updateChangeOfProvinceFile(sourceFilePath, fileDetails);
+
+  // Now override the batch number with the duplicate one
+  fileDetails.batchNumber = batchNumber;
+
+  // Update the first line to use duplicate batch number
+  const content = await fs.readFile(sourceFilePath, 'utf-8');
+  const lines = content.split(/\r?\n/);
+
+  if (lines.length > 0) {
+    // For TDAF Change of Province, batch number is in first line
+    // Format: "0000LON-TDAF2026-02-26 02413499"
+    // We need to replace the entire line with the duplicate batch (prepended with 0000)
+    lines[0] = `0000${batchNumber}`;
+  }
+
+  await fs.writeFile(sourceFilePath, lines.join('\n'), 'utf-8');
+
+  const remotePath = buildSftpRemotePath(fileDetails.fileInfo, inputFileName);
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  await clearSftpDirectory(remoteDir);
+  await uploadToSftp(sourceFilePath, remotePath);
+
+  fileDetails.inputFileName = inputFileName;
+
+  console.log(`Created TDAF Change of Province file with duplicate batch number: ${batchNumber}`);
+  console.log(`File uploaded to: ${remotePath}`);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1283,11 +1488,10 @@ export async function createGmfclNfFile(fileDetails: FileDetails): Promise<void>
 
   await updateGmfclFile(sourceFilePath, fileDetails);
 
-  const targetPath = path.join(env.sftpRoot, 'GMFCLCR', 'in', inputFileName);
-  const targetDir = path.dirname(targetPath);
-  await ensureDirectory(targetDir);
-  await clearDirectory(targetDir);
-  await copyFile(sourceFilePath, targetPath);
+  const remotePath = `/GMFCLCR/in/${inputFileName}`;
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  await clearSftpDirectory(remoteDir);
+  await uploadToSftp(sourceFilePath, remotePath);
   fileDetails.inputFileName = inputFileName;
   console.log(`✓ GMFCL file created: ${inputFileName}`);
   console.log(`  Partner Reference: ${fileDetails.partnerReference}`);
@@ -1318,11 +1522,10 @@ export async function createGmfcrNfFile(fileDetails: FileDetails): Promise<void>
 
   await updateGmfcrFile(sourceFilePath, fileDetails);
 
-  const targetPath = path.join(env.sftpRoot, 'GMFCLCR', 'in', inputFileName);
-  const targetDir = path.dirname(targetPath);
-  await ensureDirectory(targetDir);
-  await clearDirectory(targetDir);
-  await copyFile(sourceFilePath, targetPath);
+  const remotePath = `/GMFCLCR/in/${inputFileName}`;
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  await clearSftpDirectory(remoteDir);
+  await uploadToSftp(sourceFilePath, remotePath);
   fileDetails.inputFileName = inputFileName;
   console.log(`✓ GMFCR file created: ${inputFileName}`);
   console.log(`  Partner Reference: ${fileDetails.partnerReference}`);

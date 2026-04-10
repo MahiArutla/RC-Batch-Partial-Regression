@@ -4,13 +4,13 @@ import { expect } from '../fixtures/test';
 const HANGFIRE_IFRAME = "//iframe[contains(@src,'hangfiredashboard')]";
 
 export class HangfireJobsPage {
-  private readonly hangfireDashboard: Locator;
-  private readonly hfJobs: Locator;
-  private readonly hfJobOverview: Locator;
-  private readonly hfFileReprocess: Locator;
-  private readonly hfDbIframe: Locator;
-  private readonly hfDashboardTab: Locator;
-  private readonly hfDbRecurringJobsTab: Locator;
+  public readonly hangfireDashboard: Locator;
+  public readonly hfJobs: Locator;
+  public readonly hfJobOverview: Locator;
+  public readonly hfFileReprocess: Locator;
+  public readonly hfDbIframe: Locator;
+  public readonly hfDashboardTab: Locator;
+  public readonly hfDbRecurringJobsTab: Locator;
   private readonly recurringJobTable: Locator;
   private readonly nextBtn: Locator;
   private readonly triggerNow: Locator;

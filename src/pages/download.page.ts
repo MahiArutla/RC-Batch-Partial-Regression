@@ -177,7 +177,7 @@ export class DownloadPage {
 
     let matchedCriteria = false;
     for (const candidate of candidates) {
-      await this.searchInTable.fill(candidate);
+     // await this.searchInTable.fill(candidate);
       try {
         await expect
           .poll(
@@ -254,5 +254,70 @@ export class DownloadPage {
     }
 
     return targetPath;
+  }
+
+  async downloadAndVerifySLAReport(fileDetails: FileDetails, downloadDir: string, testName: string) {
+    const candidates = [
+      fileDetails.inputFileName ?? '',
+      fileDetails.batchNumber ?? '',
+      fileDetails.partnerReference ?? '',
+      'ClientSLAReport',
+    ];
+
+    const matchedCriteria = await this.searchTableWithCandidates(candidates);
+    if (!matchedCriteria) {
+      await this.searchInTable.fill('');
+      await this.goBtn.click();
+      await expect
+        .poll(async () => this.getTableResultCount(), {
+          timeout: 30000,
+          message:
+            'Waiting for SLA Report search results. Ensure that the search criteria are correct and that the file exists in the table.',
+        })
+        .toBeGreaterThan(0);
+    }
+
+    const slaReportRegex = /ClientSLAReport/i;
+    const candidateRow = this.page
+      .locator('datatable-body-row')
+      .filter({ hasText: slaReportRegex })
+      .first();
+    const row = (await candidateRow.count()) > 0
+      ? candidateRow
+      : this.page.locator('datatable-body-row').first();
+
+    await row.waitFor({ state: 'visible', timeout: 10000 });
+    await row.scrollIntoViewIfNeeded();
+
+    const fileNameLocator = row
+      .locator('datatable-body-cell')
+      .nth(2)
+      .locator('.datatable-body-cell-label');
+    await expect(fileNameLocator).toBeVisible({ timeout: 5000 });
+
+    const rawName = (await fileNameLocator.innerText()).trim();
+    if (!rawName) {
+      throw new Error('SLA Report row found in table but unable to read the filename text.');
+    }
+
+    fileDetails.slaReportFileName = rawName;
+
+    const [download] = await Promise.all([
+      this.page.waitForEvent('download'),
+      row.locator('fa-icon#edit[icon="download"], fa-icon[icon="download"]').click(),
+    ]);
+
+    const path = await import('path');
+    const artifactsDir = path.join(process.cwd(), 'artifacts', testName);
+    const fs = await import('fs');
+    if (!fs.existsSync(artifactsDir)) {
+      fs.mkdirSync(artifactsDir, { recursive: true });
+    }
+    if (!fileDetails.slaReportFileName) {
+      throw new Error('slaReportFileName is undefined. Could not find the file name in the table row.');
+    }
+    const targetPath = path.join(artifactsDir, fileDetails.slaReportFileName);
+    await download.saveAs(targetPath);
+    console.log(`✓ ClientSLAReport downloaded: ${fileDetails.slaReportFileName}`);
   }
 }

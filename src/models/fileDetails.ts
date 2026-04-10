@@ -25,6 +25,7 @@ export interface FileDetails {
   uniqueId?: string;
   orderId?: string;
   summaryReportFileName?: string;
+  slaReportFileName?: string;
   returnFileName?: string;
   baseRegistrationNum?: string;
   downloadFilePath?: string;

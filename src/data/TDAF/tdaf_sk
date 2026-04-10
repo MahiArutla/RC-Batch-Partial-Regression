@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Xif-Document Version="1.0" Database="ONGLTS9" Direction="Import">
+	<Batch Number="7723">
+		<Date Format="yyyy-MM-dd">2024-09-26</Date>
+	</Batch>
+	<Registration-List>
+			
+							
+		<Registration Type="New">
+			<Partner-Reference>31150352</Partner-Reference>
+			<PPR Province="SK"/>
+			<Contract>
+				<Date Format="yyyy-MM-dd">2024-09-23</Date>
+				<Type>Retail</Type>
+				<Term Unit="Month">97</Term>
+				<Amount>102405.73</Amount>
+				<Maturity-Date Format="yyyy-MM-dd">2032-09-13</Maturity-Date>
+			</Contract>
+			<Party-List>
+				<Party Type="Debtor-Individual">
+					<First-Name>Paul</First-Name>
+					<Middle-Name>Franklin</Middle-Name>
+					<Last-Name>Durocher</Last-Name>
+					<Birth-Date Format="yyyy-MM-dd">1965-03-01</Birth-Date>
+					<Address>
+						<Street>3284 Main STREET</Street>
+						<City>MEADOW LAKE</City>
+						<Province>SK</Province>
+						<Postal-Code>S9X 1Z7</Postal-Code>
+					</Address>
+					<Sync-Id>1</Sync-Id>
+					<ON.Notify-Language>English</ON.Notify-Language>
+				</Party>
+			</Party-List>
+			<Collaterals>
+				<Collateral Type="Serial" Condition="Used">
+					<Serial-Number>1FTFW1E83NKE28654</Serial-Number>
+					<Make>Ford</Make>
+					<Model>F150</Model>
+					<Year>2022</Year>
+					<Category>Motor Vehicle</Category>
+				</Collateral>
+			</Collaterals>
+		</Registration>
+	</Registration-List>
+</Xif-Document>

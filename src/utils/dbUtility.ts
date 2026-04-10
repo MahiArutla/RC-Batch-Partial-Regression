@@ -519,4 +519,112 @@ export class DbService {
     console.log(`Retrieved existing batch number for ${client}: ${batchNumber}`);
     return batchNumber;
   }
+
+  async getExistingBatchNumberByPattern(client: string, pattern: string, fallbackClient?: string): Promise<string> {
+    const pool = await this.getPool();
+
+    // Try primary client first with pattern matching
+    let result = await pool
+      .request()
+      .input('client', sql.VarChar(50), client)
+      .input('pattern', sql.VarChar(100), pattern)
+      .query(
+        'SELECT TOP 1 BatchNumber ' +
+          'FROM RegistrationCGeJson ' +
+          'WHERE ClientInfoId = (SELECT Id FROM dbo.ClientInfo WHERE CorporationCode = @client) ' +
+          'AND BatchNumber LIKE @pattern ' +
+          'ORDER BY UpdatedDateTime DESC'
+      );
+    let batchNumber = result.recordset[0]?.BatchNumber;
+
+    // If no data found and fallback client provided, try fallback
+    if (!batchNumber && fallbackClient) {
+      console.log(`No batch number matching pattern '${pattern}' found for ${client}, trying fallback client: ${fallbackClient}`);
+      result = await pool
+        .request()
+        .input('client', sql.VarChar(50), fallbackClient)
+        .input('pattern', sql.VarChar(100), pattern)
+        .query(
+          'SELECT TOP 1 BatchNumber ' +
+            'FROM RegistrationCGeJson ' +
+            'WHERE ClientInfoId = (SELECT Id FROM dbo.ClientInfo WHERE CorporationCode = @client) ' +
+            'AND BatchNumber LIKE @pattern ' +
+            'ORDER BY UpdatedDateTime DESC'
+        );
+      batchNumber = result.recordset[0]?.BatchNumber;
+      if (batchNumber) {
+        console.log(`Retrieved existing batch number matching '${pattern}' from ${fallbackClient}: ${batchNumber}`);
+        return batchNumber;
+      }
+    }
+
+    if (!batchNumber) {
+      throw new Error(
+        `No existing batch number matching pattern '${pattern}' found for client: ${client}` +
+        (fallbackClient ? ` or fallback client: ${fallbackClient}` : '')
+      );
+    }
+    console.log(`Retrieved existing batch number matching '${pattern}' for ${client}: ${batchNumber}`);
+    return batchNumber;
+  }
+
+  async getJSONRequestByBatchNumber(batchNumber: string): Promise<any> {
+    const pool = await this.getPool();
+
+    const result = await pool
+      .request()
+      .input('batchNumber', sql.VarChar(50), batchNumber)
+      .query(
+        'SELECT JSONRequest ' +
+          'FROM RegistrationCGeJson ' +
+          'WHERE BatchNumber = @batchNumber'
+      );
+
+    if (!result.recordset || result.recordset.length === 0) {
+      throw new Error(`No JSONRequest found for BatchNumber: ${batchNumber}`);
+    }
+
+    const jsonString = result.recordset[0]?.JSONRequest;
+    if (!jsonString) {
+      throw new Error(`JSONRequest is null or empty for BatchNumber: ${batchNumber}`);
+    }
+
+    try {
+      return JSON.parse(jsonString);
+    } catch (error) {
+      throw new Error(`Failed to parse JSONRequest for BatchNumber: ${batchNumber}. Error: ${error}`);
+    }
+  }
+
+  async validateRegistrationTerm(batchNumber: string, province: string, expectedTerm: string): Promise<void> {
+    const jsonRequest = await this.getJSONRequestByBatchNumber(batchNumber);
+
+    console.log(`Validating RegistrationTerm for BatchNumber: ${batchNumber}, Province: ${province}`);
+
+    const provinceKey = province.charAt(0).toUpperCase() + province.slice(1).toLowerCase();
+    const jurisdictionInfo = jsonRequest?.JurisdictionSpecificInfo?.[provinceKey];
+
+    if (!jurisdictionInfo) {
+      throw new Error(
+        `JurisdictionSpecificInfo.${provinceKey} not found in JSONRequest for BatchNumber: ${batchNumber}`
+      );
+    }
+
+    const actualTerm = jurisdictionInfo.RegistrationTerm;
+
+    if (actualTerm === undefined || actualTerm === null) {
+      throw new Error(
+        `RegistrationTerm not found in JurisdictionSpecificInfo.${provinceKey} for BatchNumber: ${batchNumber}`
+      );
+    }
+
+    if (String(actualTerm) !== String(expectedTerm)) {
+      throw new Error(
+        `RegistrationTerm mismatch for BatchNumber: ${batchNumber}. ` +
+        `Expected: "${expectedTerm}", Actual: "${actualTerm}"`
+      );
+    }
+
+    console.log(`✓ RegistrationTerm validated: ${actualTerm} (expected: ${expectedTerm})`);
+  }
 }

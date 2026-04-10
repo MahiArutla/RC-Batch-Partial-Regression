@@ -14,6 +14,67 @@ import { loadEnv } from '../config/env';
 
 export class Orchestrator {
   // ─────────────────────────────────────────────────────────────────────────────
+  // TDAF SLA Report Happy Path
+  // ─────────────────────────────────────────────────────────────────────────────
+  async runSLAReportHappyPath(
+    page: Page,
+    scenarioId: string,
+    client: string,
+    sampleFileName: string,
+    testName: string,
+    province: string
+  ): Promise<FileDetails> {
+    const fileDetails = loadScenarioData(scenarioId);
+    const fsSync = await import('fs');
+    const localSampleByClient = path.resolve(process.cwd(), 'src', 'data', client, sampleFileName);
+    const localSampleAtRoot = path.resolve(process.cwd(), 'src', 'data', sampleFileName);
+    fileDetails.sampleFile = fsSync.existsSync(localSampleByClient) ? localSampleByClient : localSampleAtRoot;
+    fileDetails.client = client;
+    fileDetails.fileInfo = client;
+    fileDetails.scenarioId = scenarioId;
+
+    await fileSystem.createNfFileByClient(fileDetails);
+
+    if (!fileDetails.inputFileDescription) {
+      throw new Error(
+        `InputFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
+        `Please add it so DB can resolve the NF UniqueId.`
+      );
+    }
+
+    const db = new DbService();
+    fileDetails.batchType = 'NF';
+    await db.setProcessAndFileStatusToNotStarted(fileDetails);
+    const hangfirePage = new HangfireJobsPage(page);
+    await hangfirePage.goToHFJobs(db, fileDetails);
+
+    const manualProcessingService = new ManualProcessingService();
+    const manualResponse = await manualProcessingService.processManualTransaction(fileDetails, province, 'superuser');
+    console.log('Manual Processing API response:', manualResponse);
+
+    // Download and verify ClientSLAReport instead of ClientSummaryFile
+    fileDetails.downloadFileType = 'ClientSLAReport';
+    const downloadPage = new DownloadPage(page);
+    await downloadPage.setDownloadCriteria(fileDetails);
+    const downloadDir = process.env.PW_DOWNLOADS_DIR || path.resolve(process.cwd(), 'downloads');
+    await downloadPage.downloadAndVerifySLAReport(fileDetails, downloadDir, testName);
+
+    // Verify SLA Report headers
+    ExcelHelper.verifySLAReportHeaders(
+      path.join(process.cwd(), 'artifacts', testName, fileDetails.slaReportFileName!)
+    );
+    console.log('ClientSLAReport file downloaded and verified:', fileDetails.slaReportFileName);
+
+    console.log(
+      `File processed with Batchnumber ${fileDetails.batchNumber}, ` +
+      `filename ${fileDetails.inputFileName}  PartnerReference ${fileDetails.partnerReference} ` +
+      `and OrderId ${fileDetails.orderId}`
+    );
+
+    return fileDetails;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
   // GBC Happy Path NF
   // ─────────────────────────────────────────────────────────────────────────────
   async runHappyPath(
@@ -272,7 +333,7 @@ export class Orchestrator {
     fileDetails.batchType = 'COP';
     await db.setProcessAndFileStatusToNotStarted(fileDetails);
     const hangfirePage = new HangfireJobsPage(page);
-    await hangfirePage.goToProcessHFJobs(db, fileDetails, true);
+    await hangfirePage.goToProcessHFJobs(db, fileDetails, false);
     await db.validateHandshakeJobStatus(fileDetails);
     console.log('Handshake job status validated in DB');
 
@@ -1148,7 +1209,7 @@ export class Orchestrator {
     fileDetails: FileDetails,
     downloadDir: string,
     testName: string,
-    maxAttempts: number = 6
+    maxAttempts: number = 4
   ): Promise<void> {
     const triggerReturnGeneration = async (): Promise<void> => {
       fileDetails.batchType = 'Return';

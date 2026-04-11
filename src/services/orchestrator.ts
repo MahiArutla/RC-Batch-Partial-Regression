@@ -502,46 +502,47 @@ export class Orchestrator {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // ClearCharge Happy Path (Billing -> Summary download)
+  // ClearCharge Happy Path NF
   // ─────────────────────────────────────────────────────────────────────────────
-  async runClearChargeHappyPath(
-    page: Page,
-    scenarioId: string,
-    testName: string
-  ): Promise<FileDetails> {
+  async runClearChargeHappyPath(page: Page, scenarioId: string, testName: string): Promise<FileDetails> {
     const fileDetails = loadScenarioData(scenarioId);
     fileDetails.client = fileDetails.client || 'CLEARCHARGE';
     fileDetails.fileInfo = fileDetails.fileInfo || 'CLEARCHARGE';
     fileDetails.scenarioId = scenarioId;
-
-    await fileSystem.createNfFileByClient(fileDetails);
+    fileDetails.sampleFile = path.resolve(process.cwd(), 'src', 'data', 'CLEARCHARGE', 'CC_NF.dx2');
 
     if (!fileDetails.inputFileDescription) {
       throw new Error(
         `InputFileDescription is missing in TestData.xlsx for scenario ${scenarioId}. ` +
-        `Please add it so DB can resolve the billing file UniqueId.`
+        `Please add a description so DB lookup can resolve UniqueId.`
       );
     }
+
+    await fileSystem.createNfFileByClient(fileDetails);
 
     const db = new DbService();
     fileDetails.batchType = 'NF';
     await db.setProcessAndFileStatusToNotStarted(fileDetails);
     const hangfirePage = new HangfireJobsPage(page);
-    await hangfirePage.goToProcessHFJobs(db, fileDetails, true);
-    await db.validateClientFileSchedulerJobFileStatusInDB(fileDetails);
-    console.log('ClearCharge billing file picked up by scheduler and marked Found in DB');
+    await hangfirePage.goToProcessHFJobs(db, fileDetails);
 
     const downloadPage = new DownloadPage(page);
     await downloadPage.setDownloadCriteria(fileDetails);
     const downloadDir = process.env.PW_DOWNLOADS_DIR || path.resolve(process.cwd(), 'downloads');
     await downloadPage.downloadAndVerify(fileDetails, downloadDir, testName);
+
     if (!fileDetails.summaryReportFileName) {
       throw new Error('ClearCharge summary report was not downloaded.');
     }
-    console.log('ClearCharge summary report downloaded:', fileDetails.summaryReportFileName);
+
+    ExcelHelper.verifyClearChargeSubmittedSuccessfully(
+      path.join(process.cwd(), 'artifacts', testName, fileDetails.summaryReportFileName)
+    );
+    console.log('ClearCharge summary report downloaded and verified:', fileDetails.summaryReportFileName);
 
     return fileDetails;
   }
+
 
   // ─────────────────────────────────────────────────────────────────────────────
   // BNS Commercial Happy Path Discharge

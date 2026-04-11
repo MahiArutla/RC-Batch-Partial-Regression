@@ -135,4 +135,39 @@ export class ExcelHelper {
 
     console.log('✓ All expected SLA Report headers are present');
   }
+
+  static verifyClearChargeSubmittedSuccessfully(filePath: string) {
+    const fs = require('fs');
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`ClearCharge summary file not found at path: ${filePath}`);
+    }
+    const workbook = XLSX.readFile(filePath);
+    const sheetName = 'File Import Summary';
+    const sheet = workbook.Sheets[sheetName];
+
+    if (!sheet) {
+      throw new Error(`Sheet "${sheetName}" not found in ClearCharge summary file`);
+    }
+
+    const jsonData: any[] = XLSX.utils.sheet_to_json(sheet, {
+      header: 1,
+      defval: '',
+    });
+
+    let submittedSuccessfully = 0;
+    for (let i = 0; i < jsonData.length; i++) {
+      const row = jsonData[i] as any[];
+      if (row[0] && String(row[0]).includes('Clear Charge Transaction Count')) {
+        if (i + 1 < jsonData.length) {
+          const dataRow = jsonData[i + 1] as any[];
+          submittedSuccessfully = Number(dataRow[1] || 0);
+          break;
+        }
+      }
+    }
+
+    console.log('ClearCharge - Submitted Successfully to CG:', submittedSuccessfully);
+
+    expect(submittedSuccessfully).toBeGreaterThan(0);
+  }
 }

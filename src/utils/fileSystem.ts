@@ -1532,3 +1532,33 @@ export async function createGmfcrNfFile(fileDetails: FileDetails): Promise<void>
   console.log(`  Batch Number: ${fileDetails.batchNumber}`);
 }
 
+export async function createTdafNfFileWithDuplicateName(
+  fileDetails: FileDetails,
+  duplicateFileName: string
+): Promise<void> {
+  const scenarioArtifactsDir = path.join(process.cwd(), 'artifacts', fileDetails.scenarioId);
+  await ensureDirectory(scenarioArtifactsDir);
+
+  // Use the duplicate filename instead of generating a new one
+  const localFilePath = path.join(scenarioArtifactsDir, duplicateFileName);
+  await copyFile(fileDetails.sampleFile, localFilePath);
+
+  // Generate new batch number and partner reference for this file
+  fileDetails.batchNumber = generateBatchNumber();
+  fileDetails.partnerReference = generateTdafReference();
+
+  await updateBatchNumberInXifFile(localFilePath, fileDetails.batchNumber);
+  await updatePartnerReferenceInXifFile(localFilePath, fileDetails.partnerReference);
+
+  fileDetails.inputFileName = duplicateFileName;
+
+  const remotePath = buildSftpRemotePath(fileDetails.fileInfo, duplicateFileName);
+  const remoteDir = path.dirname(remotePath).replace(/\\/g, '/');
+  // Do NOT clear the SFTP directory to allow duplicate filename
+  await uploadToSftp(localFilePath, remotePath);
+
+  console.log(`Created TDAF NF file with duplicate filename: ${duplicateFileName}`);
+  console.log(`File uploaded to: ${remotePath}`);
+  console.log(`Batch Number: ${fileDetails.batchNumber}`);
+}
+

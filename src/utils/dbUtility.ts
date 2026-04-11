@@ -627,4 +627,60 @@ export class DbService {
 
     console.log(`✓ RegistrationTerm validated: ${actualTerm} (expected: ${expectedTerm})`);
   }
+
+  async disableDuplicateFileNameCheck(fileDescription: string, client: string): Promise<void> {
+    const pool = await this.getPool();
+    await pool
+      .request()
+      .input('description', sql.VarChar(200), fileDescription)
+      .input('client', sql.VarChar(50), client)
+      .query(
+        'UPDATE ClientFileInfo ' +
+        'SET DisableDuplicateFileNameCheck = 0 ' +
+        'WHERE ClientInfoId = (SELECT Id FROM dbo.ClientInfo WHERE CorporationCode = @client) ' +
+        'AND Description = @description'
+      );
+    console.log(`Disabled duplicate filename check for: ${fileDescription}`);
+  }
+
+  async enableDuplicateFileNameCheck(fileDescription: string, client: string): Promise<void> {
+    const pool = await this.getPool();
+    await pool
+      .request()
+      .input('description', sql.VarChar(200), fileDescription)
+      .input('client', sql.VarChar(50), client)
+      .query(
+        'UPDATE ClientFileInfo ' +
+        'SET DisableDuplicateFileNameCheck = 1 ' +
+        'WHERE ClientInfoId = (SELECT Id FROM dbo.ClientInfo WHERE CorporationCode = @client) ' +
+        'AND Description = @description'
+      );
+    console.log(`Enabled duplicate filename check for: ${fileDescription}`);
+  }
+
+  async getLastUploadedFileName(fileDescription: string): Promise<string> {
+    const pool = await this.getPool();
+    const result = await pool
+      .request()
+      .input('description', sql.VarChar(200), fileDescription)
+      .query(
+        'SELECT TOP 1 sf.OriginalFileName ' +
+        'FROM ScheduledFile sf ' +
+        'INNER JOIN ClientFileInfo cfi ON sf.ClientFileInfoId = cfi.Id ' +
+        'WHERE cfi.Description = @description ' +
+        'ORDER BY sf.Id DESC'
+      );
+
+    if (!result.recordset || result.recordset.length === 0) {
+      throw new Error(`No uploaded file found for description: ${fileDescription}`);
+    }
+
+    const fileName = result.recordset[0]?.OriginalFileName;
+    if (!fileName) {
+      throw new Error(`OriginalFileName is null for description: ${fileDescription}`);
+    }
+
+    console.log(`Retrieved last uploaded filename for ${fileDescription}: ${fileName}`);
+    return fileName;
+  }
 }

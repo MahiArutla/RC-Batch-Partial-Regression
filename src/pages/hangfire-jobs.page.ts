@@ -48,6 +48,11 @@ export class HangfireJobsPage {
     this.recurringJobsLink = this.hangfireFrame.locator("//a[contains(text(),'Recurring Jobs')]");
   }
 
+  // Public getter for hangfireFrame to allow test access
+  getHangfireFrame(): FrameLocator {
+    return this.hangfireFrame;
+  }
+
   async goToHFJobs(db: any, fileDetails: any): Promise<void> {
     await this.hangfireDashboard.click();
     await this.hfJobs.click();
@@ -251,6 +256,29 @@ export class HangfireJobsPage {
       console.log(`Error message: ${message}`);
     } else {
       console.log('No duplicate batch number errors found');
+    }
+
+    return { count, message };
+  }
+
+  async validateDuplicateFileNameError(fileName: string): Promise<{ count: number; message: string }> {
+    // Wait a bit for the failed job to appear
+    await this.page.waitForTimeout(2000);
+
+    // Locator for error message containing "DuplicateFileNameDBUpdateException"
+    const errorLocator = this.hangfireFrame.locator(
+      `//*[contains(text(), 'DuplicateFileNameDBUpdateException') or contains(text(), 'SFTP: DuplicateFileNameDBUpdateException')]`
+    );
+
+    const count = await errorLocator.count();
+    let message = '';
+
+    if (count > 0) {
+      message = await errorLocator.first().textContent() || '';
+      console.log(`Found ${count} duplicate filename error(s)`);
+      console.log(`Error message: ${message}`);
+    } else {
+      console.log('No duplicate filename errors found');
     }
 
     return { count, message };

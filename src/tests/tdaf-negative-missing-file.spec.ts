@@ -53,8 +53,8 @@ test.describe('TDAF Negative Tests', () => {
       await hangfirePage.triggerHFJobWithEnqueue('ClientFileScheduler');
       console.log('Triggered ClientFileScheduler Hangfire job');
 
-      // Wait for the job to process
-      await page.waitForTimeout(5000);
+      // Wait for the job to process and fail
+      await page.waitForTimeout(10000);
     });
 
     await test.step('Verify error message in database', async () => {
@@ -147,8 +147,8 @@ test.describe('TDAF Negative Tests', () => {
       await hangfirePage.triggerHFJobWithEnqueue('ClientFileScheduler');
       console.log('Triggered ClientFileScheduler Hangfire job');
 
-      // Wait for the job to process
-      await page.waitForTimeout(5000);
+      // Wait for the job to process and fail
+      await page.waitForTimeout(10000);
     });
 
     await test.step('Verify error message in database', async () => {
@@ -241,8 +241,8 @@ test.describe('TDAF Negative Tests', () => {
       await hangfirePage.triggerHFJobWithEnqueue('ClientFileScheduler');
       console.log('Triggered ClientFileScheduler Hangfire job');
 
-      // Wait for the job to process
-      await page.waitForTimeout(5000);
+      // Wait for the job to process and fail
+      await page.waitForTimeout(10000);
     });
 
     await test.step('Verify error message in database', async () => {
@@ -360,8 +360,8 @@ test.describe('TDAF Negative Tests', () => {
       await hangfirePage.triggerHFJobWithEnqueue('ClientFileScheduler');
       console.log('Triggered ClientFileScheduler Hangfire job');
 
-      // Wait for the job to process
-      await page.waitForTimeout(5000);
+      // Wait for the job to process and fail
+      await page.waitForTimeout(10000);
     });
 
     await test.step('Verify file was not found due to invalid name template', async () => {
@@ -484,8 +484,8 @@ test.describe('TDAF Negative Tests', () => {
       await hangfirePage.triggerHFJobWithEnqueue('ClientFileScheduler');
       console.log('Triggered ClientFileScheduler Hangfire job');
 
-      // Wait for the job to process
-      await page.waitForTimeout(5000);
+      // Wait for the job to process and fail
+      await page.waitForTimeout(10000);
     });
 
     await test.step('Verify file was not found due to invalid name template', async () => {
@@ -608,8 +608,8 @@ test.describe('TDAF Negative Tests', () => {
       await hangfirePage.triggerHFJobWithEnqueue('ClientFileScheduler');
       console.log('Triggered ClientFileScheduler Hangfire job');
 
-      // Wait for the job to process
-      await page.waitForTimeout(5000);
+      // Wait for the job to process and fail
+      await page.waitForTimeout(10000);
     });
 
     await test.step('Verify file was not found due to invalid name template', async () => {
@@ -716,8 +716,8 @@ test.describe('TDAF Negative Tests', () => {
       await hangfirePage.triggerHFJob('File Parsing');
       console.log('Triggered File Parsing Hangfire job');
 
-      // Wait for the job to process
-      await page.waitForTimeout(5000);
+      // Wait for the job to process and fail
+      await page.waitForTimeout(10000);
     });
 
     await test.step('Validate duplicate batch number error in Hangfire UI', async () => {
@@ -801,8 +801,8 @@ test.describe('TDAF Negative Tests', () => {
       await hangfirePage.triggerHFJob('File Parsing');
       console.log('Triggered File Parsing Hangfire job');
 
-      // Wait for the job to process
-      await page.waitForTimeout(5000);
+      // Wait for the job to process and fail
+      await page.waitForTimeout(10000);
     });
 
     await test.step('Validate duplicate batch number error in Hangfire UI', async () => {
@@ -886,8 +886,8 @@ test.describe('TDAF Negative Tests', () => {
       await hangfirePage.triggerHFJob('File Parsing');
       console.log('Triggered File Parsing Hangfire job');
 
-      // Wait for the job to process
-      await page.waitForTimeout(5000);
+      // Wait for the job to process and fail
+      await page.waitForTimeout(10000);
     });
 
     await test.step('Validate duplicate batch number error in Hangfire UI', async () => {
@@ -911,6 +911,538 @@ test.describe('TDAF Negative Tests', () => {
     await test.step('Verify duplicate batch number was used in Discharge', async () => {
       expect(dischargeFileDetails.batchNumber).toBe(existingBatchNumber);
       console.log('✓ Discharge duplicate batch number test completed successfully');
+    });
+  });
+
+  test('TDAF_Duplicate_FileName_NF', async ({ page, loginPage }) => {
+    const env = loadEnv();
+
+    await test.step('Login to web app', async () => {
+      await loginPage.goto(env.webAppUrl);
+      await loginPage.login(env.adminUser, env.adminPassword);
+    });
+    console.log('Logged into web application');
+
+    const db = new DbService();
+    const homePage = new HomePage(page);
+    const hangfirePage = new HangfireJobsPage(page);
+
+    // Load file details from testData.xlsx
+    const fileDetails = loadScenarioData('TDAF_Duplicate_FileName_NF');
+    fileDetails.client = 'TDAF';
+    fileDetails.fileInfo = 'TDAF';
+    fileDetails.scenarioId = 'TDAF_Duplicate_FileName_NF';
+    fileDetails.batchType = 'NF';
+    fileDetails.sampleFile = path.resolve(process.cwd(), 'src', 'data', 'TDAF', 'TDAF_NF');
+
+    if (!fileDetails.inputFileDescription) {
+      throw new Error(
+        `InputFileDescription is missing in TestData.xlsx for scenario TDAF_Duplicate_FileName_NF. ` +
+        `Please add it so DB can resolve the NF UniqueId.`
+      );
+    }
+
+    await test.step('Enable duplicate filename check in database', async () => {
+      // Set DisableDuplicateFileNameCheck = 0 to ENABLE the check (detect duplicates)
+      // Note: The column name is confusing - 0 means the check is NOT disabled (i.e., enabled)
+      await db.disableDuplicateFileNameCheck(fileDetails.inputFileDescription, 'TDAF');
+      console.log(`Enabled duplicate filename check for: ${fileDetails.inputFileDescription}`);
+    });
+
+    let lastUploadedFileName = '';
+    await test.step('Get last uploaded filename from ScheduledFile table', async () => {
+      lastUploadedFileName = await db.getLastUploadedFileName(fileDetails.inputFileDescription);
+      console.log(`Retrieved last uploaded filename: ${lastUploadedFileName}`);
+    });
+
+    await test.step('Create NF file with duplicate filename', async () => {
+      await fileSystem.createTdafNfFileWithDuplicateName(fileDetails, lastUploadedFileName);
+      console.log(`Created file with duplicate name: ${lastUploadedFileName}`);
+    });
+
+    await test.step('Set process and file status to not started', async () => {
+      await db.setProcessAndFileStatusToNotStarted(fileDetails);
+      console.log(`Database setup complete. UniqueId: ${fileDetails.uniqueId}`);
+    });
+
+    await test.step('Navigate to Hangfire Dashboard', async () => {
+      await homePage.openHangfireJobs();
+      await hangfirePage.openRecurringJobs();
+    });
+
+    await test.step('Trigger ClientFileScheduler - should detect duplicate filename', async () => {
+      await hangfirePage.triggerHFJobWithEnqueue('ClientFileScheduler');
+      console.log('Triggered ClientFileScheduler Hangfire job');
+
+      // Wait for the job to process and fail
+      await page.waitForTimeout(5000);
+    });
+
+    await test.step('Validate duplicate filename error in Hangfire Failed Jobs', async () => {
+      const hangfireFrame = hangfirePage.getHangfireFrame();
+
+        // Navigate to Hangfire Failed Jobs
+      await hangfirePage.navigateToEnqueuedJobs();
+      await hangfirePage.navigateToFailedJobs();
+await page.waitForTimeout(2000);
+
+      // Look for the SFTP: DuplicateFileName job
+      const failedJobLocator = hangfireFrame.locator("//*[contains(text(), 'SFTP: DuplicateFileName') or contains(text(), 'DuplicateFileName')]");
+      const failedJobCount = await failedJobLocator.count();
+
+      expect(failedJobCount).toBeGreaterThanOrEqual(1);
+      console.log(`✓ Found ${failedJobCount} failed job(s) with DuplicateFileName`);
+
+      // Check for "Duplicate File Name Found" error message in the failed job details
+      const pageContentFinal = await hangfireFrame.locator('body').textContent();
+      const hasDuplicateError = pageContentFinal?.toLowerCase().includes('duplicate file name found');
+
+      expect(hasDuplicateError).toBeTruthy();
+      console.log('✓ "Duplicate File Name Found" error message confirmed in Hangfire Failed Jobs');
+
+      // Try to get the specific error message text
+      const errorDetailsLocator = hangfireFrame.locator("//*[contains(text(), 'Duplicate File Name Found')]").first();
+      if (await errorDetailsLocator.isVisible({ timeout: 3000 })) {
+        const errorText = await errorDetailsLocator.textContent();
+        console.log(`✓ Error details: ${errorText?.substring(0, 100)}...`);
+      }
+    });
+
+    await test.step('Verify duplicate filename was used', async () => {
+      expect(fileDetails.inputFileName).toBe(lastUploadedFileName);
+      console.log('✓ TDAF Duplicate filename test completed successfully');
+    });
+
+    await test.step('Restore duplicate filename check setting in database', async () => {
+      // Set DisableDuplicateFileNameCheck = 1 to restore normal behavior (allow duplicates)
+      await db.enableDuplicateFileNameCheck(fileDetails.inputFileDescription, 'TDAF');
+      console.log(`Restored duplicate filename check setting for: ${fileDetails.inputFileDescription}`);
+    });
+  });
+
+  test('TDAF_Duplicate_FileName_Renewal', async ({ page, loginPage }) => {
+    const env = loadEnv();
+
+    await test.step('Login to web app', async () => {
+      await loginPage.goto(env.webAppUrl);
+      await loginPage.login(env.adminUser, env.adminPassword);
+    });
+    console.log('Logged into web application');
+
+    const db = new DbService();
+    const homePage = new HomePage(page);
+    const hangfirePage = new HangfireJobsPage(page);
+
+    // Load file details from testData.xlsx
+    const fileDetails = loadScenarioData('TDAF_Duplicate_FileName_Renewal');
+    fileDetails.client = 'TDAF';
+    fileDetails.fileInfo = 'TDAF';
+    fileDetails.scenarioId = 'TDAF_Duplicate_FileName_Renewal';
+    fileDetails.batchType = 'Renewal';
+    fileDetails.sampleFile = path.resolve(process.cwd(), 'src', 'data', 'TDAF', 'TDAF_Renewal.csv');
+
+    // Use renewalFileDescription instead of inputFileDescription for Renewal files
+    if (!fileDetails.renewalFileDescription) {
+      throw new Error(
+        `RenewalFileDescription is missing in TestData.xlsx for scenario TDAF_Duplicate_FileName_Renewal. ` +
+        `Please add it so DB can resolve the Renewal UniqueId.`
+      );
+    }
+
+    await test.step('Enable duplicate filename check in database', async () => {
+      // Set DisableDuplicateFileNameCheck = 0 to ENABLE the check (detect duplicates)
+      await db.disableDuplicateFileNameCheck(fileDetails.renewalFileDescription!, 'TDAF');
+      console.log(`Enabled duplicate filename check for: ${fileDetails.renewalFileDescription}`);
+    });
+
+    let lastUploadedFileName = '';
+    await test.step('Get last uploaded filename from ScheduledFile table', async () => {
+      lastUploadedFileName = await db.getLastUploadedFileName(fileDetails.renewalFileDescription!);
+      console.log(`Retrieved last uploaded filename: ${lastUploadedFileName}`);
+    });
+
+    await test.step('Create Renewal file with duplicate filename', async () => {
+      // Create a renewal file using the fileSystem utility
+      const scenarioArtifactsDir = path.join(process.cwd(), 'artifacts', fileDetails.scenarioId);
+      await fs.mkdir(scenarioArtifactsDir, { recursive: true });
+
+      // Copy the sample file with the duplicate filename
+      const localFilePath = path.join(scenarioArtifactsDir, lastUploadedFileName);
+      await fs.copyFile(fileDetails.sampleFile, localFilePath);
+
+      // Generate new batch number and partner reference for this file
+      const newBatchNumber = 'LON-TDAF' + new Date().toISOString().replace(/[-:T.]/g, '').substring(0, 14);
+      const newPartnerRef = 'DUP' + String(Math.floor(Math.random() * 100000000)).padStart(8, '0');
+
+      // Update the renewal CSV file with new batch number
+      const content = await fs.readFile(localFilePath, 'utf-8');
+      const lines = content.split(/\r?\n/);
+      if (lines.length > 0) {
+        lines[0] = `${newBatchNumber},,,,,,,,,,`;
+      }
+      if (lines.length >= 3 && newPartnerRef) {
+        const cells = lines[2].split(',');
+        if (cells.length > 0) {
+          cells[0] = newPartnerRef;
+        }
+        lines[2] = cells.join(',');
+      }
+      await fs.writeFile(localFilePath, lines.join('\n'), 'utf-8');
+
+      fileDetails.batchNumber = newBatchNumber;
+      fileDetails.partnerReference = newPartnerRef;
+      fileDetails.inputFileName = lastUploadedFileName;
+
+      // Upload to SFTP
+      const sftp = getSftpClient();
+      const remotePath = `/tdaf/in/${lastUploadedFileName}`;
+      await sftp.uploadFile(localFilePath, remotePath);
+
+      console.log(`Created Renewal file with duplicate name: ${lastUploadedFileName}`);
+      console.log(`Batch Number: ${fileDetails.batchNumber}`);
+    });
+
+    await test.step('Set process and file status to not started', async () => {
+      await db.setProcessAndFileStatusToNotStarted(fileDetails);
+      console.log(`Database setup complete. UniqueId: ${fileDetails.uniqueId}`);
+    });
+
+    await test.step('Navigate to Hangfire Dashboard', async () => {
+      await homePage.openHangfireJobs();
+      await hangfirePage.openRecurringJobs();
+    });
+
+    await test.step('Trigger ClientFileScheduler - should detect duplicate filename', async () => {
+      await hangfirePage.triggerHFJobWithEnqueue('ClientFileScheduler');
+      console.log('Triggered ClientFileScheduler Hangfire job');
+
+      // Wait for the job to process and fail
+      await page.waitForTimeout(5000);
+    });
+
+    await test.step('Validate duplicate filename error in Hangfire Failed Jobs', async () => {
+      // Navigate to Hangfire Failed Jobs
+      await hangfirePage.navigateToEnqueuedJobs();
+      await hangfirePage.navigateToFailedJobs();
+await page.waitForTimeout(2000);
+      // Take a screenshot for evidence
+      await page.screenshot({ path: `test-results/duplicate-filename-renewal-error-${Date.now()}.png`, fullPage: true });
+      console.log('✓ Screenshot captured of Hangfire Failed Jobs page');
+
+      // Look for the SFTP: DuplicateFileName job
+      const hangfireFrame = hangfirePage.getHangfireFrame();
+      const failedJobLocator = hangfireFrame.locator("//*[contains(text(), 'SFTP: DuplicateFileName') or contains(text(), 'DuplicateFileName')]");
+      const failedJobCount = await failedJobLocator.count();
+
+      expect(failedJobCount).toBeGreaterThanOrEqual(1);
+      console.log(`✓ Found ${failedJobCount} failed job(s) with DuplicateFileName`);
+
+      // Check for "Duplicate File Name Found" error message in the failed job details
+      const pageContent = await hangfireFrame.locator('body').textContent();
+      const hasDuplicateError = pageContent?.toLowerCase().includes('duplicate file name found');
+
+      expect(hasDuplicateError).toBeTruthy();
+      console.log('✓ "Duplicate File Name Found" error message confirmed in Hangfire Failed Jobs');
+
+      // Try to get the specific error message text
+      const errorDetailsLocator = hangfireFrame.locator("//*[contains(text(), 'Duplicate File Name Found')]").first();
+      if (await errorDetailsLocator.isVisible({ timeout: 3000 })) {
+        const errorText = await errorDetailsLocator.textContent();
+        console.log(`✓ Error details: ${errorText?.substring(0, 100)}...`);
+      }
+    });
+
+    await test.step('Verify duplicate filename was used', async () => {
+      expect(fileDetails.inputFileName).toBe(lastUploadedFileName);
+      console.log('✓ TDAF Renewal Duplicate filename test completed successfully');
+    });
+
+    await test.step('Restore duplicate filename check setting in database', async () => {
+      // Set DisableDuplicateFileNameCheck = 1 to restore normal behavior (allow duplicates)
+      await db.enableDuplicateFileNameCheck(fileDetails.renewalFileDescription!, 'TDAF');
+      console.log(`Restored duplicate filename check setting for: ${fileDetails.renewalFileDescription}`);
+    });
+  });
+
+  test('TDAF_Duplicate_FileName_Discharge', async ({ page, loginPage }) => {
+    const env = loadEnv();
+
+    await test.step('Login to web app', async () => {
+      await loginPage.goto(env.webAppUrl);
+      await loginPage.login(env.adminUser, env.adminPassword);
+    });
+    console.log('Logged into web application');
+
+    const db = new DbService();
+    const homePage = new HomePage(page);
+    const hangfirePage = new HangfireJobsPage(page);
+
+    // Load file details from testData.xlsx
+    const fileDetails = loadScenarioData('TDAF_Duplicate_FileName_Discharge');
+    fileDetails.client = 'TDAF';
+    fileDetails.fileInfo = 'TDAF';
+    fileDetails.scenarioId = 'TDAF_Duplicate_FileName_Discharge';
+    fileDetails.batchType = 'Discharge';
+    fileDetails.sampleFile = path.resolve(process.cwd(), 'src', 'data', 'TDAF', 'TDAF_Discharge.txt');
+
+    // Use dischargeFileDescription for Discharge files
+    if (!fileDetails.dischargeFileDescription) {
+      throw new Error(
+        `DischargeFileDescription is missing in TestData.xlsx for scenario TDAF_Duplicate_FileName_Discharge. ` +
+        `Please add it so DB can resolve the Discharge UniqueId.`
+      );
+    }
+
+    await test.step('Enable duplicate filename check in database', async () => {
+      // Set DisableDuplicateFileNameCheck = 0 to ENABLE the check (detect duplicates)
+      await db.disableDuplicateFileNameCheck(fileDetails.dischargeFileDescription!, 'TDAF');
+      console.log(`Enabled duplicate filename check for: ${fileDetails.dischargeFileDescription}`);
+    });
+
+    let lastUploadedFileName = '';
+    await test.step('Get last uploaded filename from ScheduledFile table', async () => {
+      lastUploadedFileName = await db.getLastUploadedFileName(fileDetails.dischargeFileDescription!);
+      console.log(`Retrieved last uploaded filename: ${lastUploadedFileName}`);
+    });
+
+    await test.step('Create Discharge file with duplicate filename', async () => {
+      // Create a discharge file
+      const scenarioArtifactsDir = path.join(process.cwd(), 'artifacts', fileDetails.scenarioId);
+      await fs.mkdir(scenarioArtifactsDir, { recursive: true });
+
+      // Copy the sample file with the duplicate filename
+      const localFilePath = path.join(scenarioArtifactsDir, lastUploadedFileName);
+      await fs.copyFile(fileDetails.sampleFile, localFilePath);
+
+      // Generate new batch number and partner reference for this file
+      const newBatchNumber = 'LON-TDAF' + new Date().toISOString().replace(/[-:T.]/g, '').substring(0, 14);
+      const newPartnerRef = 'DUP' + String(Math.floor(Math.random() * 100000000)).padStart(8, '0');
+
+      // Update the discharge TXT file with new batch number and partner reference
+      const content = await fs.readFile(localFilePath, 'utf-8');
+      const lines = content.split(/\r?\n/);
+
+      // TDAF Discharge format: LON-TDAF<timestamp>,<partner_reference>
+      if (lines.length > 0 && lines[0].trim()) {
+        lines[0] = `${newBatchNumber},${newPartnerRef}`;
+      }
+
+      await fs.writeFile(localFilePath, lines.join('\n'), 'utf-8');
+
+      fileDetails.batchNumber = newBatchNumber;
+      fileDetails.partnerReference = newPartnerRef;
+      fileDetails.inputFileName = lastUploadedFileName;
+
+      // Upload to SFTP
+      const sftp = getSftpClient();
+      const remotePath = `/tdaf/in/${lastUploadedFileName}`;
+      await sftp.uploadFile(localFilePath, remotePath);
+
+      console.log(`Created Discharge file with duplicate name: ${lastUploadedFileName}`);
+      console.log(`Batch Number: ${fileDetails.batchNumber}`);
+    });
+
+    await test.step('Set process and file status to not started', async () => {
+      await db.setProcessAndFileStatusToNotStarted(fileDetails);
+      console.log(`Database setup complete. UniqueId: ${fileDetails.uniqueId}`);
+    });
+
+    await test.step('Navigate to Hangfire Dashboard', async () => {
+      await homePage.openHangfireJobs();
+      await hangfirePage.openRecurringJobs();
+    });
+
+    await test.step('Trigger ClientFileScheduler - should detect duplicate filename', async () => {
+      await hangfirePage.triggerHFJobWithEnqueue('ClientFileScheduler');
+      console.log('Triggered ClientFileScheduler Hangfire job');
+
+      // Wait for the job to process and fail
+      await page.waitForTimeout(5000);
+    });
+
+    await test.step('Validate duplicate filename error in Hangfire Failed Jobs', async () => {
+      // Navigate to Hangfire Failed Jobs
+      await hangfirePage.navigateToEnqueuedJobs();
+      await hangfirePage.navigateToFailedJobs();
+await page.waitForTimeout(2000);
+      // Take a screenshot for evidence
+      await page.screenshot({ path: `test-results/duplicate-filename-discharge-error-${Date.now()}.png`, fullPage: true });
+      console.log('✓ Screenshot captured of Hangfire Failed Jobs page');
+
+      // Look for the SFTP: DuplicateFileName job
+      const hangfireFrame = hangfirePage.getHangfireFrame();
+      const failedJobLocator = hangfireFrame.locator("//*[contains(text(), 'SFTP: DuplicateFileName') or contains(text(), 'DuplicateFileName')]");
+      const failedJobCount = await failedJobLocator.count();
+
+      expect(failedJobCount).toBeGreaterThanOrEqual(1);
+      console.log(`✓ Found ${failedJobCount} failed job(s) with DuplicateFileName`);
+
+      // Check for "Duplicate File Name Found" error message in the failed job details
+      const pageContent = await hangfireFrame.locator('body').textContent();
+      const hasDuplicateError = pageContent?.toLowerCase().includes('duplicate file name found');
+
+      expect(hasDuplicateError).toBeTruthy();
+      console.log('✓ "Duplicate File Name Found" error message confirmed in Hangfire Failed Jobs');
+
+      // Try to get the specific error message text
+      const errorDetailsLocator = hangfireFrame.locator("//*[contains(text(), 'Duplicate File Name Found')]").first();
+      if (await errorDetailsLocator.isVisible({ timeout: 3000 })) {
+        const errorText = await errorDetailsLocator.textContent();
+        console.log(`✓ Error details: ${errorText?.substring(0, 100)}...`);
+      }
+    });
+
+    await test.step('Verify duplicate filename was used', async () => {
+      expect(fileDetails.inputFileName).toBe(lastUploadedFileName);
+      console.log('✓ TDAF Discharge Duplicate filename test completed successfully');
+    });
+
+    await test.step('Restore duplicate filename check setting in database', async () => {
+      // Set DisableDuplicateFileNameCheck = 1 to restore normal behavior (allow duplicates)
+      await db.enableDuplicateFileNameCheck(fileDetails.dischargeFileDescription!, 'TDAF');
+      console.log(`Restored duplicate filename check setting for: ${fileDetails.dischargeFileDescription}`);
+    });
+  });
+
+  test('TDAF_Duplicate_FileName_ChangeOfProvince', async ({ page, loginPage }) => {
+    const env = loadEnv();
+
+    await test.step('Login to web app', async () => {
+      await loginPage.goto(env.webAppUrl);
+      await loginPage.login(env.adminUser, env.adminPassword);
+    });
+    console.log('Logged into web application');
+
+    const db = new DbService();
+    const homePage = new HomePage(page);
+    const hangfirePage = new HangfireJobsPage(page);
+
+    // Load file details from testData.xlsx
+    const fileDetails = loadScenarioData('TDAF_Duplicate_FileName_ChangeOfProvince');
+    fileDetails.client = 'TDAF';
+    fileDetails.fileInfo = 'TDAF';
+    fileDetails.scenarioId = 'TDAF_Duplicate_FileName_ChangeOfProvince';
+    fileDetails.batchType = 'COP';
+    fileDetails.sampleFile = path.resolve(process.cwd(), 'src', 'data', 'TDAF', 'TDAF_ChangeOfProvince.txt');
+
+    // Use copFileDescription for Change of Province files from testdata.xlsx
+    if (!fileDetails.copFileDescription) {
+      throw new Error(
+        `COPFileDescription is missing in TestData.xlsx for scenario TDAF_Duplicate_FileName_ChangeOfProvince. ` +
+        `Please add it so DB can resolve the Change of Province UniqueId.`
+      );
+    }
+
+    await test.step('Enable duplicate filename check in database', async () => {
+      // Set DisableDuplicateFileNameCheck = 0 to ENABLE the check (detect duplicates)
+      // Get the description value from testdata.xlsx (copFileDescription)
+      await db.disableDuplicateFileNameCheck(fileDetails.copFileDescription!, 'TDAF');
+      console.log(`Enabled duplicate filename check for: ${fileDetails.copFileDescription}`);
+    });
+
+    let lastUploadedFileName = '';
+    await test.step('Get last uploaded filename from ScheduledFile table', async () => {
+      lastUploadedFileName = await db.getLastUploadedFileName(fileDetails.copFileDescription!);
+      console.log(`Retrieved last uploaded filename: ${lastUploadedFileName}`);
+    });
+
+    await test.step('Create Change of Province file with duplicate filename', async () => {
+      // Create a Change of Province file
+      const scenarioArtifactsDir = path.join(process.cwd(), 'artifacts', fileDetails.scenarioId);
+      await fs.mkdir(scenarioArtifactsDir, { recursive: true });
+
+      // Copy the sample file with the duplicate filename
+      const localFilePath = path.join(scenarioArtifactsDir, lastUploadedFileName);
+      await fs.copyFile(fileDetails.sampleFile, localFilePath);
+
+      // Generate new batch number and partner reference for this file
+      const newBatchNumber = 'LON-TDAF' + new Date().toISOString().replace(/[-:T.]/g, '').substring(0, 14);
+      const newPartnerRef = 'DUP' + String(Math.floor(Math.random() * 100000000)).padStart(8, '0');
+
+      // Update the Change of Province TXT file with new batch number and partner reference
+      const content = await fs.readFile(localFilePath, 'utf-8');
+      const lines = content.split(/\r?\n/);
+
+      // TDAF Change of Province format: LON-TDAF<timestamp>,<partner_reference>
+      if (lines.length > 0 && lines[0].trim()) {
+        lines[0] = `${newBatchNumber},${newPartnerRef}`;
+      }
+
+      await fs.writeFile(localFilePath, lines.join('\n'), 'utf-8');
+
+      fileDetails.batchNumber = newBatchNumber;
+      fileDetails.partnerReference = newPartnerRef;
+      fileDetails.inputFileName = lastUploadedFileName;
+
+      // Upload to SFTP
+      const sftp = getSftpClient();
+      const remotePath = `/tdaf/in/${lastUploadedFileName}`;
+      await sftp.uploadFile(localFilePath, remotePath);
+
+      console.log(`Created Change of Province file with duplicate name: ${lastUploadedFileName}`);
+      console.log(`Batch Number: ${fileDetails.batchNumber}`);
+    });
+
+    await test.step('Set process and file status to not started', async () => {
+      await db.setProcessAndFileStatusToNotStarted(fileDetails);
+      console.log(`Database setup complete. UniqueId: ${fileDetails.uniqueId}`);
+    });
+
+    await test.step('Navigate to Hangfire Dashboard', async () => {
+      await homePage.openHangfireJobs();
+      await hangfirePage.openRecurringJobs();
+    });
+
+    await test.step('Trigger ClientFileScheduler - should detect duplicate filename', async () => {
+      await hangfirePage.triggerHFJobWithEnqueue('ClientFileScheduler');
+      console.log('Triggered ClientFileScheduler Hangfire job');
+
+      // Wait for the job to process and fail
+      await page.waitForTimeout(1000);
+    });
+
+    await test.step('Validate duplicate filename error in Hangfire Failed Jobs', async () => {
+      // Navigate to Hangfire Failed Jobs
+      await hangfirePage.navigateToEnqueuedJobs();
+      await hangfirePage.navigateToFailedJobs();
+await page.waitForTimeout(2000);
+      // Take a screenshot for evidence
+      await page.screenshot({ path: `test-results/duplicate-filename-cop-error-${Date.now()}.png`, fullPage: true });
+      console.log('✓ Screenshot captured of Hangfire Failed Jobs page');
+
+      // Look for the SFTP: DuplicateFileName job
+      const hangfireFrame = hangfirePage.getHangfireFrame();
+      const failedJobLocator = hangfireFrame.locator("//*[contains(text(), 'SFTP: DuplicateFileName') or contains(text(), 'DuplicateFileName')]");
+      const failedJobCount = await failedJobLocator.count();
+
+      expect(failedJobCount).toBeGreaterThanOrEqual(1);
+      console.log(`✓ Found ${failedJobCount} failed job(s) with DuplicateFileName`);
+
+      // Check for "Duplicate File Name Found" error message in the failed job details
+      const pageContent = await hangfireFrame.locator('body').textContent();
+      const hasDuplicateError = pageContent?.toLowerCase().includes('duplicate file name found');
+
+      expect(hasDuplicateError).toBeTruthy();
+      console.log('✓ "Duplicate File Name Found" error message confirmed in Hangfire Failed Jobs');
+
+      // Try to get the specific error message text
+      const errorDetailsLocator = hangfireFrame.locator("//*[contains(text(), 'Duplicate File Name Found')]").first();
+      if (await errorDetailsLocator.isVisible({ timeout: 3000 })) {
+        const errorText = await errorDetailsLocator.textContent();
+        console.log(`✓ Error details: ${errorText?.substring(0, 100)}...`);
+      }
+    });
+
+    await test.step('Verify duplicate filename was used', async () => {
+      expect(fileDetails.inputFileName).toBe(lastUploadedFileName);
+      console.log('✓ TDAF Change of Province Duplicate filename test completed successfully');
+    });
+
+    await test.step('Restore duplicate filename check setting in database', async () => {
+      // Set DisableDuplicateFileNameCheck = 1 to restore normal behavior (allow duplicates)
+      // Use the description value from testdata.xlsx (copFileDescription)
+      await db.enableDuplicateFileNameCheck(fileDetails.copFileDescription!, 'TDAF');
+      console.log(`Restored duplicate filename check setting for: ${fileDetails.copFileDescription}`);
     });
   });
 

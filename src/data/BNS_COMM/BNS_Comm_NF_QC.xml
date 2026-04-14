@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Xif-Document Version="1.0" Database="ONCNS9" Direction="Import">
+	<Registration-List>
+			<Registration Type="New">
+			<PPR Province="QC"/>
+			<Partner-Reference>BNS_COMM_Partial_REFNUM</Partner-Reference>
+			<Contract>
+				<Date Format="yyyy-MM-dd HH:mm:ss">2020-03-17 00:00:00</Date>
+				<Term Unit="Year">5</Term>
+				<Location>
+					<City>Montreal</City>
+					<Province>Quebec</Province>
+				</Location>
+				<QC.Form Nature="C">RH</QC.Form>
+				<Shared-Income>NO</Shared-Income>
+				<Amount>1000000.00</Amount>
+			</Contract>
+			<Party-List>
+				<Party Type="Secured-Business">
+				<Sync-Id>1</Sync-Id>
+					<Address>
+						<Street>4715 Tahoe Boulevard</Street>
+						<City>Mississauga</City>
+						<Postal-Code>L4W0B4</Postal-Code>
+						<Province>ON</Province>
+					</Address>
+					<Name>The Bank of Nova Scotia</Name>
+				</Party>
+				<Party Type="Billing">
+					<Bank-Account Owner-Type="Branch"/>
+					<Transit>33993</Transit>
+				</Party>
+				<Party Type="Requesting">
+					<Transit>47696</Transit>
+				</Party>
+				<Party Type="Debtor-Business">
+				<Sync-Id>1</Sync-Id>
+					<Address>
+						<Street>1045, rue des Parlementaires</Street>
+						<City>Quebec City</City>
+						<Postal-Code>G1A 1A3</Postal-Code>
+						<Province>QC</Province>
+					</Address>
+					<Post-Search>
+						<Fax-Number>0000063081</Fax-Number>
+					</Post-Search>
+					<Name>FOREST FIRST AVIATION INC.</Name>
+				</Party>
+				<Party Type="Debtor-Individual">
+				<Sync-Id>2</Sync-Id>
+					<Address>
+						<Street>1045, rue des Pasa</Street>
+						<City>Gatineau </City>
+						<Postal-Code>G1A 7A4</Postal-Code>
+						<Province>QC</Province>
+					</Address>
+					<Post-Search>
+						<Fax-Number>0000003020</Fax-Number>
+					</Post-Search>
+					<First-Name>Roshan</First-Name>
+					<Middle-Name>Thomas A</Middle-Name>
+					<Last-Name>John</Last-Name>
+					<Birth-Date Format="yyyy-MM-dd HH:mm:ss">2020-10-16 00:00:00</Birth-Date>
+				</Party>
+				<Party Type="Debtor-Individual">
+				<Sync-Id>2</Sync-Id>
+					<Address>
+						<Street>1045, rue des Pasa</Street>
+						<City>Gatineau </City>
+						<Postal-Code>G1A 7A4</Postal-Code>
+						<Province>QC</Province>
+					</Address>
+					<Post-Search>
+						<Fax-Number>0000003020</Fax-Number>
+					</Post-Search>
+					<First-Name>Roshni</First-Name>
+					<Middle-Name>Thomas</Middle-Name>
+					<Last-Name>John</Last-Name>
+					<Birth-Date Format="yyyy-MM-dd HH:mm:ss">2020-10-16 00:00:00</Birth-Date>
+				</Party>
+			</Party-List>
+			<Collaterals>
+				<Collateral Type="General">
+				<Sync-Id>1</Sync-Id>
+					<Description>Shares in the capital stock </Description>
+				</Collateral>
+				</Collaterals>
+		</Registration>
+	</Registration-List>
+	<Batch Number="20240607100">
+		<Date Format="yyyy-MM-dd HH:mm:ss">2024-01-24 11:00:00</Date>
+	</Batch>
+</Xif-Document>

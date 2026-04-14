@@ -3,7 +3,7 @@
 	<Registration-List>
 			<Registration Type="Amendment">
 			<PPR Province="BC"/>
-			<Partner-Reference>BNS Partial Regression</Partner-Reference>
+			<Partner-Reference>BNS_COMM_Partial_REFNUM</Partner-Reference>
 			<Contract>
 				<Shared-Income>YES</Shared-Income>
 				<Reason-Text> Edit Debtor</Reason-Text>

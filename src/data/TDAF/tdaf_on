@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Xif-Document Version="1.0" Database="ONGLTS9" Direction="Import">
+	<Batch Number="12331">
+		<Date Format="yyyy-MM-dd">2020-07-17</Date>
+	</Batch>
+	<Registration-List>
+		<Registration Type="New">
+			<Partner-Reference>202416104</Partner-Reference>
+			<PPR Province="ON"/>
+			<Contract>
+				<Date Format="yyyy-MM-dd">2018-11-26</Date>
+				<Type>Retail</Type>
+				<Term Unit="Month">84</Term>
+				<Amount>15236.72</Amount>
+				<Expiry-Date Format="yyyy-MM-dd">2023-11-26</Expiry-Date>
+				<Maturity-Date Format="yyyy-MM-dd">2023-11-22</Maturity-Date>
+			</Contract>
+			<Party-List>
+				<Party Type="Debtor-Individual">
+					<First-Name>PIERRE</First-Name>
+					<Middle-Name></Middle-Name>
+					<Last-Name>GAGNON</Last-Name>
+					<Birth-Date Format="yyyy-MM-dd">1955-01-01</Birth-Date>
+					<Address>
+						<Street>1551 THE QUEENSWAY</Street>
+						<City>TORONTO</City>
+						<Province>ON</Province>
+						<Postal-Code>M2R2X8</Postal-Code>
+					</Address>
+					<Sync-Id>1</Sync-Id>
+					<ON.Notify-Language>English</ON.Notify-Language>
+				</Party>
+			</Party-List>
+			<Collaterals>
+				<Collateral Type="Serial" Condition="New">
+					<Serial-Number>2C3KA73WX6H237747</Serial-Number>
+					<Make>FORD</Make>
+					<Model>Explorer</Model>
+					<Year>2006</Year>
+					<Category>Motor Vehicle</Category>
+				</Collateral>
+			</Collaterals>
+		</Registration>
+	</Registration-List>
+</Xif-Document>

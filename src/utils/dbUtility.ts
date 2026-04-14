@@ -351,6 +351,41 @@ export class DbService {
     }
   }
 
+  async validateHandshakeNotImported(fileDetails: FileDetails): Promise<void> {
+    const batchNumber = this.normalizeBatchNumber(fileDetails.batchNumber);
+
+    const row = await this.waitFor<any | null>(
+      async () => {
+        const pool = await this.getPool();
+        const result = await pool
+          .request()
+          .input('client', sql.VarChar(50), fileDetails.client)
+          .input('batchNumber', sql.VarChar(50), batchNumber)
+          .query(
+            'SELECT TOP 1 HTTPStatusCode, ImportOrderStatus, OrderId FROM RegistrationCGeJson ' +
+              'WHERE ClientInfoId = (SELECT Id FROM ClientInfo WHERE CorporationCode = @client) ' +
+              'AND BatchNumber = @batchNumber AND IsCurrentData = 1 AND JSONResponse != ' + "'NULL'" +
+              ' ORDER BY UpdatedDateTime DESC'
+          );
+        return result.recordset[0] ?? null;
+      },
+      (r) => !!r && r.ImportOrderStatus === 'NotImported',
+      { timeoutMs: 90_000, intervalMs: 2_000 }
+    );
+
+    if (!row) {
+      throw new Error('RegistrationCGeJson row not found for NotImported validation.');
+    }
+
+    if (row.ImportOrderStatus !== 'NotImported') {
+      throw new Error(
+        `Expected ImportOrderStatus to be NotImported but got: ${row.ImportOrderStatus}`
+      );
+    }
+
+    console.log(`Handshake validated with HTTPStatusCode = ${row.HTTPStatusCode}, ImportOrderStatus = ${row.ImportOrderStatus} (file was not imported as expected)`);
+  }
+
   async setProcessAndFileStatusToNotStartedReturn(fileDetails: FileDetails): Promise<void> {
     const type = fileDetails.batchType || 'Return';
     fileDetails.uniqueId = await this.getUniqueBatchFileId(fileDetails, type);
@@ -439,5 +474,213 @@ export class DbService {
         throw new Error(`${job} Process Status Id is not Completed: ${processStatusId}`);
       }
     }
+  }
+
+  async getExistingBatchNumber(client: string, fallbackClient?: string): Promise<string> {
+    const pool = await this.getPool();
+
+    // Try primary client first
+    let result = await pool
+      .request()
+      .input('client', sql.VarChar(50), client)
+      .query(
+        'SELECT TOP 1 BatchNumber ' +
+          'FROM RegistrationCGeJson ' +
+          'WHERE ClientInfoId = (SELECT Id FROM dbo.ClientInfo WHERE CorporationCode = @client) ' +
+          'ORDER BY UpdatedDateTime DESC'
+      );
+    let batchNumber = result.recordset[0]?.BatchNumber;
+
+    // If no data found and fallback client provided, try fallback
+    if (!batchNumber && fallbackClient) {
+      console.log(`No batch number found for ${client}, trying fallback client: ${fallbackClient}`);
+      result = await pool
+        .request()
+        .input('client', sql.VarChar(50), fallbackClient)
+        .query(
+          'SELECT TOP 1 BatchNumber ' +
+            'FROM RegistrationCGeJson ' +
+            'WHERE ClientInfoId = (SELECT Id FROM dbo.ClientInfo WHERE CorporationCode = @client) ' +
+            'ORDER BY UpdatedDateTime DESC'
+        );
+      batchNumber = result.recordset[0]?.BatchNumber;
+      if (batchNumber) {
+        console.log(`Retrieved existing batch number from ${fallbackClient}: ${batchNumber}`);
+        return batchNumber;
+      }
+    }
+
+    if (!batchNumber) {
+      throw new Error(
+        `No existing batch number found for client: ${client}` +
+        (fallbackClient ? ` or fallback client: ${fallbackClient}` : '')
+      );
+    }
+    console.log(`Retrieved existing batch number for ${client}: ${batchNumber}`);
+    return batchNumber;
+  }
+
+  async getExistingBatchNumberByPattern(client: string, pattern: string, fallbackClient?: string): Promise<string> {
+    const pool = await this.getPool();
+
+    // Try primary client first with pattern matching
+    let result = await pool
+      .request()
+      .input('client', sql.VarChar(50), client)
+      .input('pattern', sql.VarChar(100), pattern)
+      .query(
+        'SELECT TOP 1 BatchNumber ' +
+          'FROM RegistrationCGeJson ' +
+          'WHERE ClientInfoId = (SELECT Id FROM dbo.ClientInfo WHERE CorporationCode = @client) ' +
+          'AND BatchNumber LIKE @pattern ' +
+          'ORDER BY UpdatedDateTime DESC'
+      );
+    let batchNumber = result.recordset[0]?.BatchNumber;
+
+    // If no data found and fallback client provided, try fallback
+    if (!batchNumber && fallbackClient) {
+      console.log(`No batch number matching pattern '${pattern}' found for ${client}, trying fallback client: ${fallbackClient}`);
+      result = await pool
+        .request()
+        .input('client', sql.VarChar(50), fallbackClient)
+        .input('pattern', sql.VarChar(100), pattern)
+        .query(
+          'SELECT TOP 1 BatchNumber ' +
+            'FROM RegistrationCGeJson ' +
+            'WHERE ClientInfoId = (SELECT Id FROM dbo.ClientInfo WHERE CorporationCode = @client) ' +
+            'AND BatchNumber LIKE @pattern ' +
+            'ORDER BY UpdatedDateTime DESC'
+        );
+      batchNumber = result.recordset[0]?.BatchNumber;
+      if (batchNumber) {
+        console.log(`Retrieved existing batch number matching '${pattern}' from ${fallbackClient}: ${batchNumber}`);
+        return batchNumber;
+      }
+    }
+
+    if (!batchNumber) {
+      throw new Error(
+        `No existing batch number matching pattern '${pattern}' found for client: ${client}` +
+        (fallbackClient ? ` or fallback client: ${fallbackClient}` : '')
+      );
+    }
+    console.log(`Retrieved existing batch number matching '${pattern}' for ${client}: ${batchNumber}`);
+    return batchNumber;
+  }
+
+  async getJSONRequestByBatchNumber(batchNumber: string): Promise<any> {
+    const pool = await this.getPool();
+
+    const result = await pool
+      .request()
+      .input('batchNumber', sql.VarChar(50), batchNumber)
+      .query(
+        'SELECT JSONRequest ' +
+          'FROM RegistrationCGeJson ' +
+          'WHERE BatchNumber = @batchNumber'
+      );
+
+    if (!result.recordset || result.recordset.length === 0) {
+      throw new Error(`No JSONRequest found for BatchNumber: ${batchNumber}`);
+    }
+
+    const jsonString = result.recordset[0]?.JSONRequest;
+    if (!jsonString) {
+      throw new Error(`JSONRequest is null or empty for BatchNumber: ${batchNumber}`);
+    }
+
+    try {
+      return JSON.parse(jsonString);
+    } catch (error) {
+      throw new Error(`Failed to parse JSONRequest for BatchNumber: ${batchNumber}. Error: ${error}`);
+    }
+  }
+
+  async validateRegistrationTerm(batchNumber: string, province: string, expectedTerm: string): Promise<void> {
+    const jsonRequest = await this.getJSONRequestByBatchNumber(batchNumber);
+
+    console.log(`Validating RegistrationTerm for BatchNumber: ${batchNumber}, Province: ${province}`);
+
+    const provinceKey = province.charAt(0).toUpperCase() + province.slice(1).toLowerCase();
+    const jurisdictionInfo = jsonRequest?.JurisdictionSpecificInfo?.[provinceKey];
+
+    if (!jurisdictionInfo) {
+      throw new Error(
+        `JurisdictionSpecificInfo.${provinceKey} not found in JSONRequest for BatchNumber: ${batchNumber}`
+      );
+    }
+
+    const actualTerm = jurisdictionInfo.RegistrationTerm;
+
+    if (actualTerm === undefined || actualTerm === null) {
+      throw new Error(
+        `RegistrationTerm not found in JurisdictionSpecificInfo.${provinceKey} for BatchNumber: ${batchNumber}`
+      );
+    }
+
+    if (String(actualTerm) !== String(expectedTerm)) {
+      throw new Error(
+        `RegistrationTerm mismatch for BatchNumber: ${batchNumber}. ` +
+        `Expected: "${expectedTerm}", Actual: "${actualTerm}"`
+      );
+    }
+
+    console.log(`✓ RegistrationTerm validated: ${actualTerm} (expected: ${expectedTerm})`);
+  }
+
+  async disableDuplicateFileNameCheck(fileDescription: string, client: string): Promise<void> {
+    const pool = await this.getPool();
+    await pool
+      .request()
+      .input('description', sql.VarChar(200), fileDescription)
+      .input('client', sql.VarChar(50), client)
+      .query(
+        'UPDATE ClientFileInfo ' +
+        'SET DisableDuplicateFileNameCheck = 0 ' +
+        'WHERE ClientInfoId = (SELECT Id FROM dbo.ClientInfo WHERE CorporationCode = @client) ' +
+        'AND Description = @description'
+      );
+    console.log(`Disabled duplicate filename check for: ${fileDescription}`);
+  }
+
+  async enableDuplicateFileNameCheck(fileDescription: string, client: string): Promise<void> {
+    const pool = await this.getPool();
+    await pool
+      .request()
+      .input('description', sql.VarChar(200), fileDescription)
+      .input('client', sql.VarChar(50), client)
+      .query(
+        'UPDATE ClientFileInfo ' +
+        'SET DisableDuplicateFileNameCheck = 1 ' +
+        'WHERE ClientInfoId = (SELECT Id FROM dbo.ClientInfo WHERE CorporationCode = @client) ' +
+        'AND Description = @description'
+      );
+    console.log(`Enabled duplicate filename check for: ${fileDescription}`);
+  }
+
+  async getLastUploadedFileName(fileDescription: string): Promise<string> {
+    const pool = await this.getPool();
+    const result = await pool
+      .request()
+      .input('description', sql.VarChar(200), fileDescription)
+      .query(
+        'SELECT TOP 1 sf.OriginalFileName ' +
+        'FROM ScheduledFile sf ' +
+        'INNER JOIN ClientFileInfo cfi ON sf.ClientFileInfoId = cfi.Id ' +
+        'WHERE cfi.Description = @description ' +
+        'ORDER BY sf.Id DESC'
+      );
+
+    if (!result.recordset || result.recordset.length === 0) {
+      throw new Error(`No uploaded file found for description: ${fileDescription}`);
+    }
+
+    const fileName = result.recordset[0]?.OriginalFileName;
+    if (!fileName) {
+      throw new Error(`OriginalFileName is null for description: ${fileDescription}`);
+    }
+
+    console.log(`Retrieved last uploaded filename for ${fileDescription}: ${fileName}`);
+    return fileName;
   }
 }

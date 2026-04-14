@@ -3,9 +3,15 @@ import { loadEnv } from '../config/env';
 import { loadScenarioData } from '../data/testData';
 import { DbService } from '../utils/dbUtility';
 import { HangfireJobsPage } from '../pages/hangfire-jobs.page';
+import { HomePage } from '../pages/home.page';
+import { Orchestrator } from '../services/orchestrator';
+import * as path from 'path';
+import * as fs from 'fs/promises';
+import { getSftpClient } from '../utils/sftp';
+import * as fileSystem from '../utils/fileSystem';
 
 test.describe('TDAF Negative Tests', () => {
-  test('TDAF - Verify error when file is not uploaded to SFTP', async ({ page, loginPage }) => {
+  test('TDAF - EmptyFile NF', async ({ page, loginPage }) => {
     const env = loadEnv();
 
     await test.step('Login to web app', async () => {
@@ -47,8 +53,8 @@ test.describe('TDAF Negative Tests', () => {
       await hangfirePage.triggerHFJobWithEnqueue('ClientFileScheduler');
       console.log('Triggered ClientFileScheduler Hangfire job');
 
-      // Wait for the job to process
-      await page.waitForTimeout(5000);
+      // Wait for the job to process and fail
+      await page.waitForTimeout(10000);
     });
 
     await test.step('Verify error message in database', async () => {
@@ -98,4 +104,6 @@ test.describe('TDAF Negative Tests', () => {
       }
     });
   });
+
+
 });

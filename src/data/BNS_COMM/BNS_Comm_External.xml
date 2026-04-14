@@ -9,7 +9,7 @@
 				<Expiry-Date Format="yyyy-MM-dd HH:mm:ss">2026-10-29 00:00:00</Expiry-Date>
 				<ON.File-Reference-Number>777782735</ON.File-Reference-Number>
 			</PPR>
-			<Partner-Reference>BNS_COMM_RefNum</Partner-Reference>
+			<Partner-Reference>BNS_COMM_Partial_REFNUM</Partner-Reference>
 			<Contract>
 				<Date Format="yyyy-MM-dd HH:mm:ss">2024-06-07 00:00:00</Date>
 				<Term Unit="Year">5</Term>

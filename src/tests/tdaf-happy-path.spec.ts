@@ -82,7 +82,7 @@ test.describe('TDAF All Province Happy Path', () => {
     // Cycle 1: New Finance
     const scenarioId1 = 'TDAF_HappyPath_NF';
     let fileDetails = await test.step('Run orchestrator path cycle 1', async () => {
-      return orchestrator.runHappyPath(page, scenarioId1, 'TDAF', 'TDAF_NF', scenarioId1, 'BC', false);
+      return orchestrator.runHappyPath(page, scenarioId1, 'TDAF', 'TDAF_NF_COP', scenarioId1, 'BC', false);
     });
     fileDetails.batchType = 'NF';
 
@@ -164,4 +164,5 @@ test.describe('TDAF All Province Happy Path', () => {
     // Note: Greenlight discharge is a special notification file
     // It generates uniqueId and return files but does NOT require manual processing or summary reports
   });
+
 });

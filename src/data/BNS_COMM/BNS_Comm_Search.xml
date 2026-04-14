@@ -3,7 +3,7 @@
 		<Search-List>
 		<Search Type="PPSA">
 			<PPR Province="BC"/>
-			<Partner-Reference>SearchTesting2</Partner-Reference>
+			<Partner-Reference>BNS_COMM_Partial_REFNUM</Partner-Reference>
 			<Contract>
 				<Shared-Income>No</Shared-Income>
 			</Contract>

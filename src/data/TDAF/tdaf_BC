@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Xif-Document Version="1.0" Database="ONGLTS9" Direction="Import">
+	<Batch Number="12331">
+		<Date Format="yyyy-MM-dd">2020-07-17</Date>
+	</Batch>
+	<Registration-List>
+		<Registration Type="New">
+			<Partner-Reference>202416102</Partner-Reference>
+			<PPR Province="BC"/>
+			<Contract>
+				<Date Format="yyyy-MM-dd">2018-10-31</Date>
+				<Type>Retail</Type>
+				<Term Unit="Month">84</Term>
+				<Amount>40604.47</Amount>
+				<Maturity-Date Format="yyyy-MM-dd">2025-10-22</Maturity-Date>
+			</Contract>
+			<Party-List>
+				<Party Type="Debtor-Individual">
+					<First-Name>Raquel</First-Name>
+					<Middle-Name/>
+					<Last-Name>Evardo</Last-Name>
+					<Birth-Date Format="yyyy-MM-dd">1967-06-17</Birth-Date>
+					<Address>
+						<Street>527 CARNATION PLACE</Street>
+						<City>VICTORIA</City>
+						<Province>BC</Province>
+						<Postal-Code>V8Z 6G6</Postal-Code>
+					</Address>
+					<Sync-Id>1</Sync-Id>
+					<ON.Notify-Language>English</ON.Notify-Language>
+				</Party>
+				<Party Type="Debtor-Individual">
+					<First-Name>Manuel</First-Name>
+					<Middle-Name/>
+					<Last-Name>Evardo</Last-Name>
+					<Birth-Date Format="yyyy-MM-dd">1964-08-19</Birth-Date>
+					<Address>
+						<Street>527 CARNATION PLACE</Street>
+						<City>VICTORIA</City>
+						<Province>BC</Province>
+						<Postal-Code>V8Z 6G6</Postal-Code>
+					</Address>
+					<Sync-Id>2</Sync-Id>
+					<ON.Notify-Language>English</ON.Notify-Language>
+				</Party>
+			</Party-List>
+			<Collaterals>
+				<Collateral Type="Serial" Condition="New">
+					<Serial-Number>KM8J23A40JU830288</Serial-Number>
+					<Make>Hyundai</Make>
+					<Model>Tucson</Model>
+					<Year>2018</Year>
+					<Category>Motor Vehicle</Category>
+				</Collateral>
+			</Collaterals>
+		</Registration>
+	</Registration-List>
+</Xif-Document>

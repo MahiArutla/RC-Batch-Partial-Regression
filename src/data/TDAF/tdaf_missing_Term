@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Xif-Document Version="1.0" Database="ONGLTS9" Direction="Import">
+	<Batch Number="12331">
+		<Date Format="yyyy-MM-dd">2020-07-17</Date>
+	</Batch>
+	<Registration-List>
+		<Registration Type="New">
+			<Partner-Reference>202416101</Partner-Reference>
+			<PPR Province="AB"/>
+			<Contract>
+				<Date Format="yyyy-MM-dd">2018-11-21</Date>
+				<Type>Retail</Type>
+				<Amount>35038.29</Amount>
+				<Maturity-Date Format="yyyy-MM-dd">2024-11-13</Maturity-Date>
+			</Contract>
+			<Party-List>
+				<Party Type="Debtor-Individual">
+					<First-Name>Seunghee</First-Name>
+					<Middle-Name/>
+					<Last-Name>Choi</Last-Name>
+					<Birth-Date Format="yyyy-MM-dd">1972-05-13</Birth-Date>
+					<Address>
+						<Street>53329 43 HIGHWAY</Street>
+						<City>ONOWAY</City>
+						<Province>AB</Province>
+						<Postal-Code>T0E 1V0</Postal-Code>
+					</Address>
+					<Sync-Id>1</Sync-Id>
+					<ON.Notify-Language>English</ON.Notify-Language>
+				</Party>
+				<Party Type="Debtor-Individual">
+					<First-Name>Yongmin</First-Name>
+					<Middle-Name/>
+					<Last-Name>Chang</Last-Name>
+					<Birth-Date Format="yyyy-MM-dd">1972-04-19</Birth-Date>
+					<Address>
+						<Street>53329 43 HIGHWAY</Street>
+						<City>ONOWAY</City>
+						<Province>AB</Province>
+						<Postal-Code>T0E 1V0</Postal-Code>
+					</Address>
+					<Sync-Id>2</Sync-Id>
+					<ON.Notify-Language>English</ON.Notify-Language>
+				</Party>
+			</Party-List>
+			<Collaterals>
+				<Collateral Type="Serial" Condition="Used">
+					<Serial-Number>5N1AR2MM0FC659184</Serial-Number>
+					<Make>Nissan</Make>
+					<Model>Pathfinder</Model>
+					<Year>2015</Year>
+					<Category>Motor Vehicle</Category>
+				</Collateral>
+			</Collaterals>
+		</Registration>
+			</Registration-List>
+</Xif-Document>

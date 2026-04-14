@@ -4,13 +4,13 @@ import { expect } from '../fixtures/test';
 const HANGFIRE_IFRAME = "//iframe[contains(@src,'hangfiredashboard')]";
 
 export class HangfireJobsPage {
-  private readonly hangfireDashboard: Locator;
-  private readonly hfJobs: Locator;
-  private readonly hfJobOverview: Locator;
-  private readonly hfFileReprocess: Locator;
-  private readonly hfDbIframe: Locator;
-  private readonly hfDashboardTab: Locator;
-  private readonly hfDbRecurringJobsTab: Locator;
+  public readonly hangfireDashboard: Locator;
+  public readonly hfJobs: Locator;
+  public readonly hfJobOverview: Locator;
+  public readonly hfFileReprocess: Locator;
+  public readonly hfDbIframe: Locator;
+  public readonly hfDashboardTab: Locator;
+  public readonly hfDbRecurringJobsTab: Locator;
   private readonly recurringJobTable: Locator;
   private readonly nextBtn: Locator;
   private readonly triggerNow: Locator;
@@ -46,6 +46,11 @@ export class HangfireJobsPage {
     this.enqueuedJobsSelectAllCheckbox = this.hangfireFrame.locator("//input[@class='js-jobs-list-select-all']");
     this.enqueuedJobsTriggerButton = this.hangfireFrame.locator("//button[@data-url='/hangfiredashboard/hangfire/jobs/scheduled/enqueue']");
     this.recurringJobsLink = this.hangfireFrame.locator("//a[contains(text(),'Recurring Jobs')]");
+  }
+
+  // Public getter for hangfireFrame to allow test access
+  getHangfireFrame(): FrameLocator {
+    return this.hangfireFrame;
   }
 
   async goToHFJobs(db: any, fileDetails: any): Promise<void> {
@@ -221,5 +226,92 @@ export class HangfireJobsPage {
     await jobCheckbox.check({ force: true });
     await this.triggerNow.click();
     await this.page.waitForTimeout(1000);
+  }
+
+  async navigateToEnqueuedJobs(): Promise<void> {
+    await this.hangFireJobs.click();
+    console.log('Navigated to Enqueued Jobs');
+  }
+
+  async navigateToFailedJobs(): Promise<void> {
+    await this.failedJobs.click();
+    console.log('Navigated to Failed Jobs');
+  }
+
+  async validateDuplicateBatchNumberError(batchNumber: string): Promise<{ count: number; message: string }> {
+    // Wait a bit for the failed job to appear
+    await this.page.waitForTimeout(2000);
+
+    // Locator for error message containing "Error: BatchNumber:" and "already exists"
+    const errorLocator = this.hangfireFrame.locator(
+      `//*[contains(text(), 'Error: BatchNumber:') and contains(text(), 'already exists')]`
+    );
+
+    const count = await errorLocator.count();
+    let message = '';
+
+    if (count > 0) {
+      message = await errorLocator.first().textContent() || '';
+      console.log(`Found ${count} duplicate batch number error(s)`);
+      console.log(`Error message: ${message}`);
+    } else {
+      console.log('No duplicate batch number errors found');
+    }
+
+    return { count, message };
+  }
+
+  async validateDuplicateFileNameError(fileName: string): Promise<{ count: number; message: string }> {
+    // Wait a bit for the failed job to appear
+    await this.page.waitForTimeout(2000);
+
+    // Locator for error message containing "DuplicateFileNameDBUpdateException"
+    const errorLocator = this.hangfireFrame.locator(
+      `//*[contains(text(), 'DuplicateFileNameDBUpdateException') or contains(text(), 'SFTP: DuplicateFileNameDBUpdateException')]`
+    );
+
+    const count = await errorLocator.count();
+    let message = '';
+
+    if (count > 0) {
+      message = await errorLocator.first().textContent() || '';
+      console.log(`Found ${count} duplicate filename error(s)`);
+      console.log(`Error message: ${message}`);
+    } else {
+      console.log('No duplicate filename errors found');
+    }
+
+    return { count, message };
+  }
+
+  async validateInvalidFileTypeError(fileName: string): Promise<{ count: number; message: string }> {
+    // Wait a bit for the failed job to appear
+    await this.page.waitForTimeout(2000);
+
+    // Locator for error message containing file type, extension, or unsupported format errors
+    const errorLocator = this.hangfireFrame.locator(
+      `//*[contains(text(), 'invalid') or contains(text(), 'extension') or contains(text(), 'unsupported') or contains(text(), 'file type') or contains(text(), '${fileName}')]`
+    );
+
+    const count = await errorLocator.count();
+    let message = '';
+
+    if (count > 0) {
+      message = await errorLocator.first().textContent() || '';
+      console.log(`Found ${count} invalid file type error(s)`);
+      console.log(`Error message: ${message}`);
+    } else {
+      // If no specific error found, check if there are any failed jobs at all
+      const anyFailedJob = this.hangfireFrame.locator('//div[@class="js-jobs-list"]//tr[contains(@class, "failed") or .//span[contains(@class, "label-danger")]]');
+      const failedCount = await anyFailedJob.count();
+      if (failedCount > 0) {
+        message = await anyFailedJob.first().textContent() || 'File processing failed';
+        console.log(`Found ${failedCount} failed job(s) - file type validation may have failed`);
+      } else {
+        console.log('No invalid file type errors or failed jobs found');
+      }
+    }
+
+    return { count, message };
   }
 }
